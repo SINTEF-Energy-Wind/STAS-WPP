@@ -1,4 +1,4 @@
-function dxdt = RotCantTimestep (x,t,mes,kes,PB,Pns,WW0,adamp)
+function dxdt = RotCantTimestep (x,t,mes,kes,PB,Pns,WW,adamp,F)
 %
 % States: q, dq/dt (each 6*Nel), azi.
 %
@@ -14,15 +14,6 @@ i6c = [3:6:6*Nel-3].';
 i6d = [4:6:6*Nel-2].';
 i6e = [5:6:6*Nel-1].';
 i6f = [6:6:6*Nel].';
-
-% ===================================================================
-% Define functions of time here...
-F = zeros(Ndof,1);
-if ((t > 0.099) && (t < 0.100))
-   F(Ndof-6+2) = 1000*sin((t-0.099)*pi/0.001);
-end
-WW = min(WW0,(t/0.05)*WW0);  % Linear ramp up, > period of first mode.
-% ===================================================================
 
 r = sqrt(PB(1)^2 + PB(2)^2);
 
@@ -98,7 +89,7 @@ for iel = 1:Nel
                                        Qu1,Qu2,dQu1,dQu2, ...
                                        mu,dmu,TsB,dTsB);
 
-   cce = dampingC (adamp*kes,dmu);
+   cce = dampingCNL (adamp*kes,dmu);
 
    if (iel == 1)
       M(rdof+[1:6],rdof+[1:6]) = M(rdof+[1:6],rdof+[1:6]) + mme(13:18,13:18);
@@ -127,7 +118,7 @@ RHS = -G*v + H - K - D + F;
 dxdt(Ndof+[1:Ndof]) = M\RHS;
 dxdt(Nx) = WW;
 
-fid = fopen('stat.txt','a');
-fprintf(fid,'%+5.6e %+5.6e %+5.6e %+5.6e %+5.6e %+5.6e\n', ...
-        t,x(Ndof-6+3),D(Ndof-6+1),D(Ndof-6+3),K(Ndof-6+1),K(Ndof-6+3));
-fclose(fid);
+%fid = fopen('stat.txt','a');
+%fprintf(fid,'%+5.6e %+5.6e %+5.6e %+5.6e %+5.6e %+5.6e\n', ...
+%        t,x(Ndof-6+3),D(Ndof-6+1),D(Ndof-6+3),K(Ndof-6+1),K(Ndof-6+3));
+%fclose(fid);

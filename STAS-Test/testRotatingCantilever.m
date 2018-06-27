@@ -11,10 +11,10 @@ clear;
 % alf = sqrt(A*L^2 / Izz)
 
 % Beam properties and operating condition.
-del = 5;
-gam = 10;
+del = 0; % 5;
+gam = 0; % 10;
 alf = 70;
-Nel = 8;
+Nel = 2;
 
 Len = 1;
 wid = sqrt(12)*Len/alf;
@@ -22,7 +22,7 @@ thk = wid*1.000001;  % For simplicity, but not precisely symmetric.
 rho = 7850;
 EE = 2e11;
 GG = EE/2.6;
-adamp = 0.000005; % % 0.00001;
+adamp = 0.00001; % 0.000005; %
 
 Area = wid*thk;
 IIyy = (wid*(thk^3))/12;
@@ -132,7 +132,7 @@ end
 % ====================================================================
 % Task 1: Linear modal analysis, no rotation.  Compare with time-
 % domain result.  2 el: [8.158, (32.631), 51.531] Hz.
-run1 = 0;
+run1 = 1;
 if (run1 == 1)
    q0      = zeros(NdofB,1);
    dq0dt   = zeros(NdofB,1);
@@ -148,30 +148,33 @@ end
 % Task 2: Nonlinear, full-model structural simulation in the time
 % domain, with rotation, using direct equations.  Test nonlinear
 % equations.  2 el, gam=2: [9.485,52.63] Hz.
-run2 = 0;
+tic
+run2 = 1;
 if (run2 == 1)
    q0    = zeros(Ndof,1);
    dq0dt = zeros(Ndof,1);  % Ramp up inside RotCantTimestep.
    x0 = [q0;dq0dt;azi0];
-   ts = [0:0.0005:0.5].'; % [0:0.0005:1].';
+   ts = [0:0.001:0.1].'; 
    lsode_options('integration method','adams');
-   [xs,ist,msg] = lsode (@(x,t)                                         ...
-                         RotCantTimestep (x,t,mes,kes,PB,Pn,WW0,adamp), ...
+   [xs,ist,msg] = lsode (@(x,t)                                            ...
+                         RotCantTimestep (x,t,mes,kes,PB,Pn,               ...
+                                          feval('RCW',t,0.05,WW0),adamp,   ...
+                                          feval('RCF',t,0,0.02,100,Ndof)), ...
                          x0,ts);
    Nt = size(ts,1);
-   fid = fopen('out.txt','w');
+   fid = fopen('outA.txt','w');
    for it = 1:Nt
-      fprintf(fid,'%+5.6e %+5.6e %+5.6e %+5.6e %+5.6e %+5.6e %+5.6e %+5.6e\n', ...
+      fprintf(fid,'%+5.6e %+5.6e %+5.6e %+5.6e %+5.6e %+5.6e %+5.6e %+5.6e %+5.6e\n', ...
               ts(it),xs(it,1:3),xs(it,7:9),xs(it,Nx));
    end
    fclose('all');
 end
-
+toc
 
 % ====================================================================
 % Task 3: Quasi-static solution of deformation under constant
 % rotational speed, in the rotating frame.
-run3 = 1;
+run3 = 0;
 if (run3 == 1)
 
    q0    = zeros(Ndof,1);
@@ -438,7 +441,7 @@ end
 % Task 5: Linear modal analysis, rotating.  Initial condition from
 % quasi-static solution.  Test linear equations.  (Need run3 = 1.)
 % 2 el, gam=2: [9.585,51.87] Hz.
-run5 = 1;
+run5 = 0;
 if (run5 == 1)
 
    x0 = xs(:,Na);

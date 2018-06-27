@@ -11,7 +11,7 @@ function [s,a] = STASTurbine_NREL5MW_land ()
 %==========================================================
 length = 1
 time   = 1
-power  = 1 % 1e6
+power  = 1e6
 voltage = sqrt(power)
 %---------------------------------------
 velocity = length/time
