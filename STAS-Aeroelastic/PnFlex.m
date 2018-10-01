@@ -1,8 +1,8 @@
-function PnFlex (xng)
+function PnFlex (xng,fname)
 
 Nnod = size(xng,1)/3;
 
-fid = fopen('Pnod.txt','w');
+fid = fopen(fname,'w');
 
 for inod = 1:Nnod
 
@@ -12,4 +12,4 @@ for inod = 1:Nnod
 
 end
 
-fclose('all');
+fclose(fid);
