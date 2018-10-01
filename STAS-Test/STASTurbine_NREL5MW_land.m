@@ -536,7 +536,7 @@ end
 %==========================================================
 
 % Split the tower between the "tower" and "foundation" in STAS.
-Lt = 38.8/length; % 43.8      /length;
+Lt = 43.8      /length; % 38.8/length; % 
 Cdt0 = 0.80;            % Over the nominal 0.65, margin to account for icing
                         % and weathering of the surface.  Ref DNV-OS-J101.
 
@@ -613,7 +613,7 @@ end
 %==========================================================
 % The foundation consists arbitrarily of the lower half of
 % the tower.
-Lf = 38.8/length; % 43.8      /length;
+Lf = 43.8      /length; % 38.8/length; % 
 
 rhow = 1024  /(mass/length^3);
 Cdf0 = 1.0;            % To account for marine growth.
