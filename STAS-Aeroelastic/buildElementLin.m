@@ -45,7 +45,9 @@ function [M,dML,dMG,G,dG,dGd,H,dH,dHd,K,dK] =                 ...
 % Inputs:
 % -------
 % mes, kes        : Element mass and stiffness matrices.
-% dqdt,d2qdt2     : Rate and acceleration of DOFs.
+% dqdt            : Rate of change of DOFs.
+% d2qL            : Acceleration term with constraint matrix, Lambda*d2qdt2.
+% d2qG            : Gamma*dqdt.
 % Qu1,2           : [v;w] = Qu*q.  Qu is 6-by-12.  The latter dimension is
 %                   6 body reference node and 6 nodal DOFs.
 % dQu1,2          : A 6-by-12*12 matrix containing dQu/dq for each node.
