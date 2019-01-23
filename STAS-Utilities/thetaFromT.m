@@ -20,7 +20,7 @@ function th = thetaFromT (T)
 
 % Compute the quaternions.
 tr = trace(T);
-[md,imd] = max(diag(T));
+[md,imd] = max(diag(real(T)));
 
 p = zeros(4,1);
 
