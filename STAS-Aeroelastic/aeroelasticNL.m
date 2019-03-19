@@ -32,8 +32,9 @@ function [Lmat,Rvec,y] =                                ...
 %
 % Inputs:
 % -------
-% t               : Time (unused).
-% x1,y1           : States and outputs from previous iteration.
+% t               : Time (presently unused).
+% x1,y1           : Present states and associated outputs (only q
+%                   and dqdt are used).
 % Fext            : Additional nodal forces that are not part of
 %                   aeroNL.
 % grav            : Gravitational acceleration in global CS.
@@ -98,4 +99,5 @@ F = F + Fext;
 Lmat = [Lms sparse(Nxs,Nxa);sparse(Nxa,Nxs) speye(Nxa)];
 Rvec = [Rvs;dxadt];
 y    = [ys;ya;F];
+
 
