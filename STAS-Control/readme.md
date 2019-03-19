@@ -1,0 +1,1 @@
+This module contains functions implementing a wind turbine controller.  The present version is a research controller with a particular structure.  The rotor speed controller is built around a hard switch between control modes.
