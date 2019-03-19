@@ -11,12 +11,16 @@ function [M,dM,MG,dMG,dMGd,R,dR,dRd,Q,dQ,dQd,slv,ret, ...
 % 23.11.2017      Original code.
 % 18.05.2018      Updated with assembleElementsLin as a direct
 %                 linearization of assembleElementsNL.
+% 24.02.2019      Deleted call to hydrodynamic added mass function;
+%                 now this is handled as extra mass in the element
+%                 mass matrices.
 %
 % Version:        Verification:
 % --------        -------------
 % 23.11.2017      M,C,K checked against buildMGHKfull, using complex
 %                 step.
 % 18.05.2018      
+% 24.02.2019      
 %
 % Inputs:
 % -------
@@ -125,20 +129,7 @@ Qhf = Qh(dofs,dofs);
         s.foundation.k(6,:).',s.foundation.k(7,:).',s.foundation.k(8,:).', ...
         P(dofs),q(dofs),dqdt(dofs));
 
-% ----------------------------------------------------------------
-% Hydrodynamic added mass.  [CHECK, MAY NEED UPDATING IN THE SAME
-% MANNER AS SOIL.]
-%{
-if (s.foundation.Nwater > 0)
-   Madd = addedMass (s.foundation.Nnod,s.foundation.Nwater,s.foundation.wel, ...
-                     s.foundation.Lel,s.foundation.rhow,s.foundation.CmA,Qhf);
-   Mz(dofs,dofs) = Mz(dofs,dofs) + Madd;
-else
-   Madd = sparse (Ndf,Ndf);
-end
-%}
-
-% Add the effect of soil and added mass forces.
+% Add the effect of soil forces.
 Fnod = F;
 Fnod(dofs) = Fnod(dofs) + Fsoil;
 
@@ -198,7 +189,7 @@ dLam       = dLambdadq (Lambda,Leq,dLdq,gdofs,ret,slv,d2qdt2(ret));
 % Set csflag = 0 if using complex step when calling
 % buildMRQLin. Otherwise, csflag = 1 provides
 % better performance within dGammadq.
-csflag = 1;
+csflag = 0;
 [dGam,dGamd] = dGammadq (csflag,q,P,dqdt,ret,slv,gdofs,idofs,idofm,Tb_h, ...
                          Leq,dLdq,Lambda,Gamma,dqdt(ret));
 
@@ -224,35 +215,13 @@ dLTdqR  = dLambdaTdq (Lambda,Leq,dLdq,gdofs,ret,slv,Rvecp);
 dR = dLTdqR*Lambda + LamT*(dRmat*Lambda + dRdmat*Gamma);
 dRd = LamT*dRdmat*Lambda;
 
-%{
-fid = fopen('rep.txt','a');
-fprintf(fid,'\n');
-fprintf(fid,'Q Lin\n');
-dQ1 = LamT*dQp*Lambda;
-dQ2 = LamT*dQdp*Gamma;
-dQ3 = dLTdqQ*Lambda;
-for ii = 1:6
-   for jj = 1:6
-      fprintf(fid,'%+5.6e ',dQ1(72+ii,72+jj));
-   end
-   fprintf(fid,'\n');
-end
-for ii = 1:6
-   for jj = 1:6
-      fprintf(fid,'%+5.6e ',dQ2(72+ii,72+jj));
-   end
-   fprintf(fid,'\n');
-end
-for ii = 1:6
-   for jj = 1:6
-      fprintf(fid,'%+5.6e ',dQ3(72+ii,72+jj));
-   end
-   fprintf(fid,'\n');
-end
-fprintf(fid,'\n');
 
-fclose(fid);
-%}
+
+
+
+
+
+
 
 
 
