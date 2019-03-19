@@ -9,11 +9,15 @@ function [M,MG,R,Q,Lambda,Gamma,Leq,dLdq] = ...
 % 18.05.2018      Updated with RHS as output, rather than separate
 %                 terms, in order to facilitate matching linear and
 %                 nonlinear functions.
+% 24.02.2019      Deleted call to hydrodynamic added mass function;
+%                 now this is handled as extra mass in the element
+%                 mass matrices.
 %
 % Version:        Verification:
 % --------        -------------
 % 03.02.2017      
 % 18.05.2018      
+% 24.02.2019      
 %
 % Inputs:
 % -------
@@ -62,17 +66,6 @@ Fsoil = soilNL (s.foundation.k(1,:).',s.foundation.k(2,:).',                    
                 s.foundation.k(3,:).',s.foundation.k(4,:).',s.foundation.k(5,:).', ...
                 s.foundation.k(6,:).',s.foundation.k(7,:).',s.foundation.k(8,:).', ...
                 P(dofs),q(dofs),dqdt(dofs));
-
-% ----------------------------------------------------------------
-% Hydrodynamic added mass.  [CHECK, MAY NEED UPDATING IN THE SAME
-% MANNER AS SOIL.]
-%{
-if (s.foundation.Nwater > 0)
-   Madd = addedMass (s.foundation.Nnod,s.foundation.Nwater,s.foundation.wel, ...
-                     s.foundation.Lel,s.foundation.rhow,s.foundation.CmA,Qhf);
-   Mz(dofs,dofs) = Mz(dofs,dofs) + Madd;
-end
-%}
 
 % Add the effect of soil and added mass forces.
 Fnod = F;
@@ -125,4 +118,6 @@ fprintf(fid,'\n');
 
 fclose(fid);
 %}
+
+
 
