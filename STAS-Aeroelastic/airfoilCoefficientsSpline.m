@@ -52,3 +52,4 @@ for jj = 1:Nw
    C = C + weights(ifoil(jj))*Cf;
 end
 
+
