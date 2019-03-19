@@ -67,11 +67,11 @@ Neb    = 16;
 % a study is focused on a group of high-frequency modes.)
 %              |  Caution, if you use more than this number, the
 %              V  code has not been validated.
-Nfnd = 2; % 10; %   20;  % Foundation.
-Ntow = 2; % 10; %   20;  % Tower.
+Nfnd = 10; %   20;  % Foundation.
+Ntow = 10; %   20;  % Tower.
 Nnac = 2;  %   8;   % Nacelle.
 Ndrv = 2;  %   18;  % Driveshaft.
-Nbld = 2; % 16; %   20;  % Blades.
+Nbld = 16; %   20;  % Blades.
 
 Nwel = 15; % Number of elements subject to wave loads.
 
