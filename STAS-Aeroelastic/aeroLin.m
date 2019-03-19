@@ -47,7 +47,8 @@ function [dxadt,A,By,C,Dy,Psi] = aeroLin (psiFlag,xa,Vg,s,a,q,dqdt,P,bsh)
 %
 % Version:        Verification:
 % --------        -------------
-% 20.01.2018      
+% 20.01.2018      Linearization matches aeroNL with complex step 
+%                 derivatives.
 %
 % Inputs:
 % -------
@@ -213,4 +214,7 @@ dxadt = Psit*dxafdt;
 A  = Psit*Af*Psi;
 By = Psit*Byf;
 C  = Cf*Psi;
+
+
+
 
