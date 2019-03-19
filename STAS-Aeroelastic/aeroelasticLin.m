@@ -60,12 +60,15 @@ function [LHS,A,Bu,By,C,Du,Dy,shape,freq,mdamp,ret,slv,Psi] =     ...
 %
 % Version:        Verification:
 % --------        -------------
-% 06.02.2018      
+% 06.02.2018      I expect there is a problem with the (dM/dq)(d^2q/dt^2)
+%                 term's linearization, but it is tricky to find, and it
+%                 is generally not critical, as the linearization is
+%                 seldom relevant in a condition with high steady DOF
+%                 accelerations.
 %
 % Inputs:
 % -------
-% ns              : Number of structural, aerodynamic, electrical, and
-%                   control states.
+% 
 %
 % Outputs:
 % --------
@@ -141,3 +144,6 @@ By(:,1:Ny) = bbyas;
 C(1:Ny,:) = ccas;
 Du(1:Ny,:) = dduas;
 Dy(1:Ny,1:Ny) = ddyas;
+
+
+
