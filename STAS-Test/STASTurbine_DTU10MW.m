@@ -81,9 +81,9 @@ Nwel = 15; % Number of elements subject to wave loads.
 % for a modal-slave representation of the aerodynamic states.
 % In the latter case, the selection of modes has to be verified
 % as the turbine design is altered.
-%icp = round(1 + (Neb-1)*[0.00 0.25 0.50 0.70 0.85 1.00]'); % Splines.
+icp = round(1 + (Neb-1)*[0.00 0.25 0.50 0.70 0.85 1.00]'); % Splines.
 %icp = -[1 3 5 7 8 9]'; % Modes. Verify as design is altered.
-icp = -1;
+%icp = -1;
 %icp = 0;
 
 % Initialization.
