@@ -6,6 +6,7 @@ ind = [1:Nmd].';
 for ib = 1:3
    ii = zeros(Nmd,1);
    ii(imdofs(5+ib)+[1:Nmb]) = 1;
+   ii(Nmd-3+ib) = 1;  % Blade pitch joint DOFs.
    ii = logical(ii);
    if (ib == 1)
       b1 = ind(ii);
@@ -15,4 +16,6 @@ for ib = 1:3
       b3 = ind(ii);
    end
 end
+
+
 
