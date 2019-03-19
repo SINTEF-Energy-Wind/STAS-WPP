@@ -24,24 +24,24 @@ function [s,a] = STASTurbine_DTU10MW ()
 %==========================================================
 % Normalization.
 %==========================================================
-length = 1
-time   = 1
+length = 1;
+time   = 1;
 power  = 1e6;
-voltage = sqrt(power)
+voltage = sqrt(power);
 %---------------------------------------
-velocity = length/time
-mass   = power*(time^3)/(length^2)
-force  = mass*length/(time^2)
-stress = force/(length^2)
-ndens  = mass/(length^3)
-nvisc  = mass/(length*time)
-stiffness = force/length
-damping = force*time/length
-current = power/voltage
-resistance = voltage/current
-inductance = voltage*time/current
-capacitance = current*time/voltage
-flux   = voltage*time
+velocity = length/time;
+mass   = power*(time^3)/(length^2);
+force  = mass*length/(time^2);
+stress = force/(length^2);
+ndens  = mass/(length^3);
+nvisc  = mass/(length*time);
+stiffness = force/length;
+damping = force*time/length;
+current = power/voltage;
+resistance = voltage/current;
+inductance = voltage*time/current;
+capacitance = current*time/voltage;
+flux   = voltage*time;
 
 LTMnorms = [length;time;mass;current];
 save('-ascii','LTMnorms.txt','LTMnorms');
@@ -67,11 +67,11 @@ Neb    = 16;
 % a study is focused on a group of high-frequency modes.)
 %              |  Caution, if you use more than this number, the
 %              V  code has not been validated.
-Nfnd = 10; %   20;  % Foundation.
-Ntow = 10; %   20;  % Tower.
+Nfnd = 2; % 10; %   20;  % Foundation.
+Ntow = 2; % 10; %   20;  % Tower.
 Nnac = 2;  %   8;   % Nacelle.
 Ndrv = 2;  %   18;  % Driveshaft.
-Nbld = 16; %   20;  % Blades.
+Nbld = 2; % 16; %   20;  % Blades.
 
 Nwel = 15; % Number of elements subject to wave loads.
 
@@ -89,10 +89,10 @@ icp = -1;
 % Initialization.
 s = createStructure (Nef,Net,Nev,Ner,Nen,Ned,Neh,Neb,Nwel);
 
-s.zdamp = 0; % 0.008; % Modal structural damping ratio.
+s.zdamp = 0.008;      % Modal structural damping ratio.
                       % or ...
 s.adamp = 0;          % Mass-proportional damping factor.
-s.bdamp = 0.0002;     % Stiffness-proportional damping factor.
+s.bdamp = 0;          % Stiffness-proportional damping factor.  0.0002;
 
 % Correct zero-lift aoa values for inboard DTU 10 MW profiles.
 load('-binary','aoazs_DTU10MW.bin');
@@ -726,11 +726,6 @@ EIyy       = sei(:,7)/(force*length^2);
 EIzz       = sei(:,8)/(force*length^2);
 GJ         = sei(:,9)/(force*length^2);
 
-CmA = [0.50*pi*(Dh(Nmud+[1:Nwater]).^2); ... % Ca = 1, + flooded tower below waterline.
-       0.25*pi*(Dh(Nmud+Nwater+[1:(Nwel-Nwater)]).^2)]; 
-
-%CmA = 0.25*pi*(Dh(Nmud+1:Nmud+Nwel).^2); % Ca = 1.
-
 % Increase the effective rho*A density to account for soil
 % within the pile.  Density of 2000 kg/m^3.
 rhosA(1:Nmud) = rhosA(1:Nmud) + 0.25*pi*(Dh(1:Nmud).^2) ...
@@ -744,7 +739,7 @@ rhosA(1:Nmud) = rhosA(1:Nmud) + 0.25*pi*(Dh(1:Nmud).^2) ...
 % values of dkxy.
 % depth = -42  -33.6  -25.2   -16.8  -8.4   0
 scale = 1.0;
-dkxy = scale*[1.15e8; 9.04e7; 6.94e7; 5.12e7; 3.25e7; 1.89e7]/(force/length);
+dkxy = scale*[1.15e8; 9.04e7; 6.94e7; 5.12e7; 3.25e7; 1.89e7]/(force/(length^2));
 
 dkz = dkxy*(1.62/2.06);
 
@@ -781,6 +776,17 @@ czg = dfac*kzg;
 kthzg = [(Dh.^2).*kzg(1:Nef)/4; (Dh(Nef)^2)*kzg(Nef+1)/4];
 cthzg = [(Dh.^2).*czg(1:Nef)/4; (Dh(Nef)^2)*czg(Nef+1)/4];
 
+% The easiest option for added mass of a monopile is simply to
+% modify the input rho*A (mass per unit length) in the lateral
+% directions.  Define CmA for all submerged and wave-effected
+% elements, for use in calculating wave excitation forces, and
+% then increase the rho*A of the submerged elements.
+CmA = [0.50*pi*(Dh(Nmud+[1:Nwater]).^2); ... % Ca = 1, + flooded tower below waterline.
+       0.25*pi*(Dh(Nmud+Nwater+[1:(Nwel-Nwater)]).^2)]; 
+%CmA = 0.25*pi*(Dh(Nmud+1:Nmud+Nwel).^2); % Ca = 1.
+rCmA = zeros(Nef,1);
+rCmA(Nmud+[1:Nwater]) = rhow*CmA(1:Nwater);
+
 % Fill in foundation body entries.
 s.foundation.Lf             = Lf;
 s.foundation.wel            = wel;
@@ -806,7 +812,7 @@ for iel = 1:Nef
    ic144 = 144*(iel-1);
 
    s.foundation.rhos(:,ic6+[1:6]) = ...
-          diag([rhosA(iel);rhosA(iel);rhosA(iel);rhosJ(iel);0;0]);
+          diag([rhosA(iel);rhosA(iel)+rCmA(iel);rhosA(iel)+rCmA(iel);rhosJ(iel);0;0]);
    s.foundation.EEs(:,ic6+[1:6]) = ...
           diag([EA(iel);0;0;GJ(iel);EIyy(iel);EIzz(iel)]);
 
