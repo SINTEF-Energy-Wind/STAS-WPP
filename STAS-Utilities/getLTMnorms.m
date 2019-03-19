@@ -1,5 +1,6 @@
-function [length,time,mass,current,velocity,force,power,stress, ...
-          ndens,nvisc,stiffness,damping,resistance,inductance,  ...
+function [length,time,mass,current,voltage,        ...
+          velocity,force,power,stress,ndens,nvisc, ...
+          stiffness,damping,resistance,inductance, ...
           capacitance,flux] = getLTMnorms (fname)
 
 load(fname);
@@ -15,8 +16,7 @@ ndens       = mass/(length^3);
 nvisc       = mass/(length*time);
 stiffness   = force/length;
 damping     = force*time/length;
-voltage     = sqrt(power);
-current     = power/voltage;
+voltage     = power/current;
 resistance  = voltage/current;
 inductance  = voltage*time/current;
 capacitance = current*time/voltage;
