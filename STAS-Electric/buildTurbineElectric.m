@@ -1,5 +1,7 @@
 function [dxdt,yout,A,B,C,D] = buildTurbineElectric (Linflag,x,yin,params)
 %
+% NOTE, add no-load losses to the system: efficiencies at low powers are too high.
+%
 % Build the unified state equations for a PMSG direct-drive generator with
 % full power conversion, transformer, and converter controls.
 %
@@ -16,32 +18,32 @@ function [dxdt,yout,A,B,C,D] = buildTurbineElectric (Linflag,x,yin,params)
 %                     isd,q    11,12   out
 %
 % ------------------- Local variables -----------------------
-% ------------------------- PMSG --------------- 11 ---------
+% ------------------------- PMSG ----------------------------
 %   igd,q     1,2     vgd,q     1,2    in   (gen. current control)
 %                     wg         3     in   (shaft)
 %                     Tg         4     out
-% ------ 2 ------- Converters and DC link ------ 15 ---------
+% ------ 2 ------- Converters and DC link -------------------
 %   Vdc        1      igd,q     1,2    in   (generator)
 %                     vgd,q     3,4    in   (gen. current control)
 %                     ipd,q     5,6    in   (transformer)
 %                     vpd,q     7,8    in   (net. converter control)
 %                     IIg        9     out
 %                     IIn       10     out
-% ------ 3 ------------- Transformer ----------- 25 ---------
+% ------ 3 ------------- Transformer ------------------------
 %   ipd,q     1,2     vpd,q     1,2    in   (net. converter control)
 %                     vsd,q     3,4    in   (grid)
 %                     we         5     in   (grid)
 %                     isd,q     6,7    out
-% ------ 5 --------- Gen. current control ------ 32 ---------
+% ------ 5 --------- Gen. current control -------------------
 %   imgd,q    1,2     wg         1     in   (shaft)
 %   Psig      3,4     igd,q     2,3    in   (generator)
 %   wemg       5      ihgd,q    4,5    in   (active power control)
 %                     vgd,q     6,7    out
-% ----- 10 ----------------- PLL --------------- 39 ---------
+% ----- 10 ----------------- PLL ----------------------------
 %   th_m       1      th_e       1     in   (grid)
 %   vmsd,q    2,3     vsd,q     2,3    in   (grid)
 %   Psie       4      wem        4     out
-% ----- 14 -------- Reactive power control ----- 43 ---------
+% ----- 14 -------- Reactive power control ------------------
 %   impd,q    1,2     ipd,q     1,2    in   (transformer)
 %   imsd,q    3,4     isd,q     3,4    in   (transformer)
 %   vmsd,q    5,6     vsd,q     5,6    in   (grid)
@@ -270,4 +272,6 @@ else
    D = sparse(Nyr,Nyr);
 
 end
+
+
 
