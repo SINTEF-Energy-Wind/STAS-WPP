@@ -7,6 +7,7 @@ indr = [1:Nret].';
 for ib = 1:3
    ii = zeros(Ndj,1);
    ii(idofs(5+ib)+[1:Ndb]) = 1;
+   ii(Ndj-3+ib) = 1;
    [ip,rr,cr] = partitionMatrix(ii,slv,[]);
    ir = ip(1:Nret);
    ir = logical(ir);
@@ -18,4 +19,6 @@ for ib = 1:3
       b3 = indr(ir);
    end
 end
+
+
 
