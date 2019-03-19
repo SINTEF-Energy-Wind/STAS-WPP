@@ -96,7 +96,7 @@ sq18 = 18^2;
 % Mass matrix. 
 M = sparse((Que.')*TmT*Que);
 
-dML = spalloc(18,18,sq18);
+dML = spalloc(18,18,sq18);  % [Think about making these full.]
 dMG = spalloc(18,18,sq18);
 for kk = 1:18
 
@@ -230,12 +230,15 @@ for jj = 1:12
 end
 
 dK = spalloc(18,18,sq18);
-mumu = mu*(mu.');
+%mumu = mu*(mu.');
+
+% [Note, this can be vectorized for faster calculation.]
+
 for ii = 1:12
 
    ic12 = 12*(ii-1);
 
-   dmuimu = dmu(:,ii)*(mu.');
+%   dmuimu = dmu(:,ii)*(mu.');
 
    for kk = 1:12
 
@@ -252,4 +255,5 @@ end
 
 % (Note that dG is antisymmetric, which destroys the symmetry
 % properties of the final assembled K matrix.)
+
 
