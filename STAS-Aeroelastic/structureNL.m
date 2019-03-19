@@ -60,6 +60,7 @@ end
 sTs = (shape.')*shape;
 Lmat = [sTs sparse(N,N);sparse(N,N) Mr];
 Rvec = [sTs*x(N+[1:N]);RHS];
+
 dxdt = Lmat\Rvec; % Needed for y output, but careful of conditioning.
 
 % Accelerations.
@@ -73,4 +74,5 @@ Gsh = Gamq*shape;
 d2qdt2 = LSh*dxdt(N+[1:N]) + Gsh*dxdt(1:N);
 
 y = [q;dqdt;d2qdt2];
+
 
