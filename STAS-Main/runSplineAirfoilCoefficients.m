@@ -1,10 +1,12 @@
 % Generate splined airfoil coefficients.
 
+nm = 'Tjaereborg'
+
 clear;
 
 % First column is aoa (deg), then trios of Cl,Cd,Cm for each airfoil type.
-load('ClCdCm_Tjaereborg.txt');
-ClCdCm = ClCdCm_Tjaereborg;
+load(['ClCdCm_' nm '.txt']);
+eval(['ClCdCm = ClCdCm_' nm]);
 
 aoas = ClCdCm(:,1)*pi/180;
 
@@ -34,9 +36,9 @@ for ifoil = 1:Nfoils
 
 end
 
-save('-binary','aoas_Tjaereborg.bin','aoas');
-save('-binary','kfoils_Tjaereborg.bin','kfoils');
-save('-binary','aoazs_Tjaereborg.bin','aoazs');
+save('-binary',['aoas_' nm '.bin'],'aoas');
+save('-binary',['kfoils_' nm '.bin'],'kfoils');
+save('-binary',['aoazs_' nm '.bin'],'aoazs');
 
 %weights = [0.5 0.5 0 0 0 0].';
 %aoa = [-180:1:180]'*(pi/180);
