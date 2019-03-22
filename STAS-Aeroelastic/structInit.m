@@ -68,18 +68,12 @@ Force = zeros(Ndj,1);
 d2q = zeros (Ndj,1); % ys(2*Ndj+[1:Ndj]);  % Zero acceleration for
                                            % computing body modes.
 
-% And get the mode shapes.
-[M,dM,MG,dMG,dMGd,R,dR,dRd,Q,dQ,dQd,slv,ret, ...
- Lambda,Gamma,Leq,dLdq,dL,dGam,dGamd] =      ...
-                    buildMRQLin (s,q,dq,d2q,P,Force);
-K = dM + dMG - dR - dQ;
-
-%dM
-%dMG
-%dR
-%dQ
-
 if (modeflag == 1)
+   % And get the mode shapes.
+   [M,dM,MG,dMG,dMGd,R,dR,dRd,Q,dQ,dQd,slv,ret, ...
+    Lambda,Gamma,Leq,dLdq,dL,dGam,dGamd] =      ...
+                       buildMRQLin (s,q,dq,d2q,P,Force);
+   K = dM + dMG - dR - dQ;
    [shape,freq,mdamp] = bodyModes (s,M,K,ret,slv);
    Neta = size(shape,2);
 elseif (modeflag == 0)
