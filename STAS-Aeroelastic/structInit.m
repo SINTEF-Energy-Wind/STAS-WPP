@@ -29,8 +29,6 @@ function [xs,etas,q,dq,d2q,P,shape,sh2,freq,mdamp,ret,slv, ...
 % ret,slv         : Retained and slave DOFs.
 %
 
-%'structInit'
-
 Nnod = s.foundation.Nnod + s.tower.Nnod + s.nacelle.Nnod     ...
      + s.driveshaft.Nnod + s.blade(1).Nnod + s.blade(2).Nnod ...
      + s.blade(3).Nnod;
@@ -85,4 +83,3 @@ end
 sh2 = [shape sparse(Nret,Neta);sparse(Nret,Neta) shape];
 
 etas = (sh2.')*xs;
-
