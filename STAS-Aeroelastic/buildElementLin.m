@@ -28,6 +28,7 @@ function [M,dML,dMG,G,dG,dGd,H,dH,dHd,K,dK] =                 ...
 % 18.05.2018      Updated such that the function is a direct linearization
 %                 of the outputs of buildElementNL, rather than combining
 %                 the terms into M, C, and K at this stage.
+% 15.04.2019      Restructured the calculations to accelerate the for loops.
 %
 % Version:        Verification:
 % --------        -------------
@@ -41,6 +42,7 @@ function [M,dML,dMG,G,dG,dGd,H,dH,dHd,K,dK] =                 ...
 %                 mu.
 % 18.05.2018      Derivatives verified again with complex step using
 %                 buildElementNL.  [CHECK VELOCITY TERMS]
+% 15.04.2019      
 %
 % Inputs:
 % -------
@@ -84,49 +86,58 @@ Que   = Qel (Qu1,Qu2);        % 12-by-18.
 dQue  = dQel (dQu1,dQu2);     % 12-by-18*18.
 d2Que = d2Qel (d2Qu1,d2Qu2);  % 12-by-18*18*18.
 
-% Velocity terms to be computed upfront.
+Qp = Que.';
+dQp = dQue.';
+d2Qp = d2Que.';
+
+% Terms to be computed upfront.
 ue = Que*dqdt;
+uep = ue.';
+dqdtp = dqdt.';
 
 TmTQ = TmT*Que;
 TmTu = TmT*ue;
 
-sq18 = 18^2;
+dQTmTQ = dQp*TmTQ;
 
 % --------------------------------------------------------------------
-% Mass matrix. 
-M = sparse((Que.')*TmT*Que);
+% Mass matrix.
+M = sparse((Que.')*TmTQ);
 
-dML = spalloc(18,18,sq18);  % [Think about making these full.]
-dMG = spalloc(18,18,sq18);
+% Other terms with the mass matrix.  Accelerated and verified.
+dML = zeros(18,18);
+dMG = zeros(18,18);
+mat = zeros(18,18*18);
 for kk = 1:18
 
    kc18 = 18*(kk-1);
    kc12 = 12*(kk-1);
 
-   mat = ((dQue(:,kc18+[1:18]).')*TmTQ ...
-       +  (TmTQ.')*dQue(:,kc18+[1:18]) ...
-       +  (Que.')*dTmT(:,kc12+[1:12])*Que);
-   dML(:,kk) = dML(:,kk) + mat*d2qL;
-   dMG(:,kk) = dMG(:,kk) + mat*d2qG;
+   mat(:,kc18+[1:18]) = dQTmTQ(kc18+[1:18],:) + dQTmTQ(kc18+[1:18],:).' ...
+                      + (Que.')*dTmT(:,kc12+[1:12])*Que;
+   dML(:,kk) = mat(:,kc18+[1:18])*d2qL;
+   dMG(:,kk) = mat(:,kc18+[1:18])*d2qG;
 
 end
 
 % --------------------------------------------------------------------
-% Gyroscopic matrix G.
-G = spalloc(18,18,sq18);
+% Gyroscopic matrix G.  Accelerated and verified.
+G = zeros(18,18);
 for jj = 1:18
 
    jc18 = 18*(jj-1);
    jc12 = 12*(jj-1);
 
-   G(:,jj) = G(:,jj)                             ...
-            + (dQue(:,jc18+[1:18]).')*TmT*ue     ...
-            + (TmTQ.')*dQue(:,jc18+[1:18])*dqdt  ...
-            + (Que.')*dTmT(:,jc12+[1:12])*ue;
+   G(:,jj) = mat(:,jc18+[1:18])*dqdt;
 
 end
 
-dG = spalloc(18,18,sq18);
+% Accelerated and verified.
+dG = zeros(18,18);
+dQpdTmT = dQp*dTmT;
+dQpTmTdQ = dQp*TmT*dQue;
+d2QpTmTQ = d2Qp*TmT*Que;
+d2QpTmTu = d2Qp*TmTu;
 for jj = 1:18
 
    jc324 = 324*(jj-1);
@@ -139,33 +150,29 @@ for jj = 1:18
       kc18 = 18*(kk-1);
       kc12 = 12*(kk-1);
 
-      % Verified.
       dG(:,kk) = dG(:,kk)                                              ...
-               + ((d2Que(:,jc324+kc18+[1:18]).')*TmT*ue                ...
-               +  (dQue(:,jc18+[1:18]).')*dTmT(:,kc12+[1:12])*ue       ...
-               +  (dQue(:,jc18+[1:18]).')*TmT*dQue(:,kc18+[1:18])*dqdt ...
-               +  (TmTQ.')*d2Que(:,jc324+kc18+[1:18])*dqdt             ...
-               +  (dQue(:,kc18+[1:18]).')*TmT*dQue(:,jc18+[1:18])*dqdt ...
-               +  (Que.')*dTmT(:,kc12+[1:12])*dQue(:,jc18+[1:18])*dqdt ...
-               +  (dQue(:,kc18+[1:18]).')*dTmT(:,jc12+[1:12])*ue       ...
-               +  (Que.')*dTmT(:,jc12+[1:12])*dQue(:,kc18+[1:18])*dqdt ...
-               +  (Que.')*d2TmT(:,jc216+kc12+[1:12])*ue)*dqdt(jj);
+               + (d2QpTmTu(jc324+kc18+[1:18])                          ...
+               +  dQpdTmT(jc18+[1:18],kc12+[1:12])*ue                  ...
+               +  dQpTmTdQ(jc18+[1:18],kc18+[1:18])*dqdt               ...
+               +  (d2QpTmTQ(jc324+kc18+[1:18],:).')*dqdt               ...
+               +  dQpTmTdQ(kc18+[1:18],jc18+[1:18])*dqdt               ...
+               +  Qp*(dQpdTmT(jc18+[1:18],kc12+[1:12]).')*dqdt         ...
+               +  dQpdTmT(kc18+[1:18],jc12+[1:12])*ue                  ...
+               +  Qp*(dQpdTmT(kc18+[1:18],jc12+[1:12]).')*dqdt         ...
+               +  Qp*d2TmT(:,jc216+kc12+[1:12])*ue)*dqdt(jj);
 
    end
 
 end
 
-dGd = spalloc(18,18,sq18);
+% Accelerated and verified.
+dGd = zeros(18,18);
 for jj = 1:18
 
    jc18 = 18*(jj-1);
    jc12 = 12*(jj-1);
 
-   % Verified.
-   dGd = dGd                              ...
-       + ((dQue(:,jc18+[1:18]).')*TmTQ    ...
-       +  (TmTQ.')*dQue(:,jc18+[1:18])    ...
-       +  (Que.')*dTmT(:,jc12+[1:12])*Que)*dqdt(jj);
+   dGd = dGd + mat(:,jc18+[1:18])*dqdt(jj);
 
 end
 
@@ -178,12 +185,13 @@ for jj = 1:18
    jc12 = 12*(jj-1);
 
    H(jj) = H(jj)                               ...
-         + ((dQue(:,jc18+[1:18])*dqdt).')*TmTu ...
-         + 0.5*(ue.')*dTmT(:,jc12+[1:12])*ue;
+         + dqdtp*dQp(jc18+[1:18],:)*TmTu       ...
+         + 0.5*uep*dTmT(:,jc12+[1:12])*ue;
 
 end
 
-dH = spalloc(18,18,sq18);
+% Accelerated and verified.
+dH = zeros(18,18);
 for ii = 1:18
 
    ic324 = 324*(ii-1);
@@ -197,28 +205,25 @@ for ii = 1:18
       kc12 = 12*(kk-1);
 
       % Verified.
-      dH(ii,kk) = dH(ii,kk) ...
-                + ((d2Que(:,ic324+kc18+[1:18])*dqdt).')*TmT*ue                ...
-                + ((dQue(:,ic18+[1:18])*dqdt).')*TmT*dQue(:,kc18+[1:18])*dqdt ...
-                + ((dQue(:,ic18+[1:18])*dqdt).')*dTmT(:,kc12+[1:12])*ue       ...
-                + (ue.')*dTmT(:,ic12+[1:12])*dQue(:,kc18+[1:18])*dqdt         ...
-                + 0.5*(ue.')*d2TmT(:,ic216+kc12+[1:12])*ue;
+      dH(ii,kk) = dH(ii,kk)                                     ...
+                + dqdtp*d2QpTmTu(ic324+kc18+[1:18])             ...
+                + dqdtp*dQpTmTdQ(ic18+[1:18],kc18+[1:18])*dqdt  ...
+                + dqdtp*dQpdTmT(ic18+[1:18],kc12+[1:12])*ue     ...
+                + dqdtp*dQpdTmT(kc18+[1:18],ic12+[1:12])*ue     ...
+                + 0.5*uep*d2TmT(:,ic216+kc12+[1:12])*ue;
 
    end
 
 end
 
-dHd = spalloc(18,18,sq18);
+% Accelerated and verified.
+dHd = zeros(18,18);
 for ii = 1:18
 
    ic18 = 18*(ii-1);
-   ic12 = 12*(ii-1);
 
    % Verified.
-   dHd(ii,:) = dHd(ii,:)                                ...
-             + (ue.')*TmT*dQue(:,ic18+[1:18])           ...
-             + ((dQue(:,ic18+[1:18])*dqdt).')*TmTQ      ...
-             + (ue.')*dTmT(:,ic12+[1:12])*Que;
+   dHd(ii,:) = dHd(ii,:) + dqdtp*mat(:,ic18+[1:18]);
 
 end
 
@@ -229,29 +234,17 @@ for jj = 1:12
    K(jj+6) = K(jj+6) + (dmu(:,jj).')*kes*mu;
 end
 
-dK = spalloc(18,18,sq18);
-%mumu = mu*(mu.');
-
-% [Note, this can be vectorized for faster calculation.]
-
+% Accelerated and verified.
+dK = zeros(18,18);
+dK(7:18,7:18) = (dmu.')*kes*dmu;
+kesmu = kes*mu;
 for ii = 1:12
 
    ic12 = 12*(ii-1);
 
-%   dmuimu = dmu(:,ii)*(mu.');
-
-   for kk = 1:12
-
-      % Verified.
-      dK(ii+6,kk+6) = dK(ii+6,kk+6)              ...
-                    + (d2mu(:,ic12+kk).')*kes*mu ...
-                    + (dmu(:,ii).')*kes*dmu(:,kk);
-
-   end
+   dK(7:18,ii+6) = dK(7:18,ii+6) + (d2mu(:,ic12+[1:12]).')*kesmu;
 
 end
-
-
 
 % (Note that dG is antisymmetric, which destroys the symmetry
 % properties of the final assembled K matrix.)

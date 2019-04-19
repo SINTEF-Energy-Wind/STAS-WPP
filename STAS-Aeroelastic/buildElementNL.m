@@ -58,6 +58,7 @@ dQue  = dQel (dQu1,dQu2);     % 12-by-18*18.
 
 % Velocity terms to be computed upfront.
 ue = Que*dqdt;
+uep = ue.';
 
 TmTQ = TmT*Que;
 TmTu = TmT*ue;
@@ -76,7 +77,7 @@ for jj = 1:18
    jc12 = 12*(jj-1);
 
    G(:,jj) = G(:,jj)                            ...
-           + (dQue(:,jc18+[1:18]).')*TmT*ue     ...
+           + (dQue(:,jc18+[1:18]).')*TmTu       ...
            + (TmTQ.')*dQue(:,jc18+[1:18])*dqdt  ...
            + (Que.')*dTmT(:,jc12+[1:12])*ue;
 
@@ -92,7 +93,7 @@ for jj = 1:18
 
    H(jj) = H(jj)                               ...
          + ((dQue(:,jc18+[1:18])*dqdt).')*TmTu ...
-         + 0.5*(ue.')*dTmT(:,jc12+[1:12])*ue;
+         + 0.5*uep*dTmT(:,jc12+[1:12])*ue;
 
 end
 

@@ -27,6 +27,7 @@ d2T = zeros(3,9*3);
 normth = sqrt((th.')*th);
 
 TTH = vecToSpin(th);
+TTHTTH = TTH*TTH;
 
 if (abs(normth) < eps^0.25)  % Complex magnitude is intentionally included
                              % in this norm.
@@ -52,7 +53,7 @@ if (abs(normth) < eps^0.25)  % Complex magnitude is intentionally included
          dij = (ii==jj);  % 1 if so, 0 if not.
 
          d2T(:,ic+[1:3]) = -dij*TTH/3 - (th(jj)*spi + th(ii)*spj)/3        ...
-                         - dij*TTH*TTH/12                                  ...
+                         - dij*TTHTTH/12                                   ...
                          - th(jj)*sTTsi/12 - th(ii)*(spj*TTH + TTH*spj)/12 ...
                          + (0.5 - normth2/24)*(spj*spi + spi*spj); 
 
