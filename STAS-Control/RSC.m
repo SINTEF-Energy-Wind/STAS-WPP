@@ -171,18 +171,20 @@ if ((((real(Wfilt) > real(Wcd)) || (real(Wfilt) > real(Wt))) && mflag == 0) || .
    A(4,:) = [0, 0, 0, -a1, 0, 0, 0, 0, 0, 0];
    B(4,:) = [0, 0, 0, a1];
 
-   % Smooth saturation and anti-windup.
+   % Smooth saturation.
    bnorm = (bhat0 - bcen)/(bmax - bcen);
    [bns,dbns,d2bns] = saturate (bnorm,[0.99;1.01]);
    bhat = (bmax - bcen)*bns + bcen;
 
-   dxdt(3) = dbns*Kib*epsW;
-   A(3,:) = dbns*Kib*dWfdx       ...
-          + dbns*dKib*epsW*dbfdx ...
-          + d2bns*Kib*epsW*dbhdx/(bmax - bcen);
-   B(3,:) = dbns*[0, 0, -Kib*dWhdV, -Kib*dWhdP] ...
-          + d2bns*Kib*epsW*dbhdu/(bmax - bcen)  ...
-          + d2bns*Kib*epsW*(-bmax/((bmax-bcen)^2))*0.5*dbdV*[0, 0, 1, 0];
+   % Anti-windup.
+   bwn = (PsiWb - bcen)/(bmax - bcen);
+   [bwns,dbwns,d2bwns] = saturate (bwn,[0.99;1.01]);   
+
+   dxdt(3) = dbwns*Kib*epsW;
+   A(3,:) = dbwns*Kib*dWfdx       ...
+          + dbwns*dKib*epsW*dbfdx ...
+          + d2bwns*Kib*epsW*[0, 0, 1, 0, 0, 0, 0, 0, 0, 0]/(bmax - bcen);
+   B(3,:) = dbwns*[0, 0, -Kib*dWhdV, -Kib*dWhdP];
 
    dxdt(10) = -ablp*blp + ablp*bhat;
    A(10,:) = [0, 0, 0, 0, 0, 0, 0, 0, 0, -ablp] + ablp*dbns*dbhdx;
