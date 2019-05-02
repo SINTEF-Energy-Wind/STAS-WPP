@@ -36,6 +36,7 @@ for ifoil = 1:Nfoils
 
 end
 
+% Valid for Gnu Octave only.
 save('-binary',['aoas_' nm '.bin'],'aoas');
 save('-binary',['kfoils_' nm '.bin'],'kfoils');
 save('-binary',['aoazs_' nm '.bin'],'aoazs');
