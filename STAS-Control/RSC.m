@@ -16,10 +16,13 @@ function [dxdt,yout,A,B,C,D] = RSC (x,u,p,WVTab,WPTab,bminTab,KTables,mflag)
 % Version:        Changes:
 % --------        -------------
 % 28.01.2019      Original code.
+% 21.04.2019      Moved anti-windup to the integrator branch only.  This
+%                 improves the behavior during switching.
 %
 % Version:        Verification:
 % --------        -------------
 % 28.01.2019      Derivatives verified by finite difference.
+% 21.04.2019      Tested the closed-loop response to step functions.
 %
 % Inputs:
 % -------
