@@ -24,7 +24,7 @@ ilam = max(min(ilam,Nl-1),1);
 ibet = floor (interp1 (bets,[1:Nb],real(bet),'extrap'));
 ibet = max(min(ibet,Nb-1),1);
 
-ind = [(ilam-1)*Nb+ibet; ilam*Nb+ibet; ilam*Nb+ibet+1; (ilam-1)*Nb+ibet+1];
+ind = 1 + [(ilam-1)*Nb+ibet; ilam*Nb+ibet; ilam*Nb+ibet+1; (ilam-1)*Nb+ibet+1];
 
 xv  = [cpct(ind,1) cpct(ind,2)];
 
