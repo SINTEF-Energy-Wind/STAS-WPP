@@ -148,10 +148,6 @@ KibTab(:,2) = 1*KibTab(:,2);
 KdbTab(:,2) = 0*KdbTab(:,2);   % Deactivate derivative gain.
 %-------------------------
 
-c.KpbTab = KpbTab;
-c.KibTab = KibTab;
-c.KdbTab = KdbTab;
-
 % -----------------------------------------------------------------------
 % KFTab: Gains on tower fore-aft damping control, as a function of blade
 % pitch angle.
@@ -184,6 +180,23 @@ c.KiiTab = zeros(Nk,2);
 c.KiiTab(:,1) = [(pi/180)*[-90 [0:1:bref] 90]].';
 c.KiiTab(:,2) = 30;                                         % CHECK.  Based on nodal rotation.
 
+% -----------------------------------------------------------------------
+% Plain tables.
+c.KpbTab0 = KpbTab;
+c.KibTab0 = KibTab;
+c.KdbTab0 = KdbTab;
+c.KeTab0 = c.KeTab;
+c.WVTab0 = c.WVTab;
+c.WPTab0 = c.WPTab;
+c.bminTab0 = c.bminTab;
+c.KFTab0 = c.KFTab;
+c.KSTab0 = c.KSTab;
+c.KSqTab0 = c.KSqTab;
+c.KpiTab0 = c.KpiTab;
+c.KiiTab0 = c.KiiTab;
+
+% -----------------------------------------------------------------------
+% pchip spline tables.
 c.KeTab   = interp1 (c.KeTab(:,1),  c.KeTab(:,2),  'pchip','pp');
 c.WVTab   = interp1 (c.WVTab(:,1),  c.WVTab(:,2),  'pchip','pp');
 c.WPTab   = interp1 (c.WPTab(:,1),  c.WPTab(:,2),  'pchip','pp');
