@@ -148,6 +148,10 @@ KibTab(:,2) = 1*KibTab(:,2);
 KdbTab(:,2) = 0*KdbTab(:,2);   % Deactivate derivative gain.
 %-------------------------
 
+c.KpbTab = KpbTab;
+c.KibTab = KibTab;
+c.KdbTab = KdbTab;
+
 % -----------------------------------------------------------------------
 % KFTab: Gains on tower fore-aft damping control, as a function of blade
 % pitch angle.
