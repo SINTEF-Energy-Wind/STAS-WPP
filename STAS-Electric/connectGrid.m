@@ -29,6 +29,7 @@ function [dxdt,A,B] = connectGrid (linFlag,x,u,p,nod)
 %                   Nnod:  C     (F)     Phase capacitance to ground at node k
 %                   Nnod:  Rr    (Ohms)  Phase resistance to ground at node k.
 %                   Nnod:  Lr    (H)     Phase inductance to ground at node k.
+% nod             : Connectivity, 2-by-Nnod.
 %
 % Outputs:
 % --------
