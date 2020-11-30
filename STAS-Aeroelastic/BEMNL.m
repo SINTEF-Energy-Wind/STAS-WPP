@@ -157,7 +157,7 @@ for iel = 1:Nel
    C(iel,:)  = airfoilCoefficientsSpline (aoas,kfoils,foilwt(:,iel),x(i7+1));
    Cq(iel,:) = airfoilCoefficientsSpline (aoas,kfoils,foilwt(:,iel),aq(iel));
    if (absc(x(i7+1) - aoaz(iel)) < eps^(0.25))
-      Cl(iel) = C(iel,4)*(aq(iel) - x(i7+1));
+      Cl(iel) = real(C(iel,4))*(aq(iel) - x(i7+1));
    else
       Cl(iel) = (1 + (aq(iel) - x(i7+1))/(x(i7+1) - aoaz(iel)))*C(iel,1);
    end
