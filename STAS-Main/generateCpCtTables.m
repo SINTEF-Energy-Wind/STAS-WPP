@@ -1,9 +1,17 @@
 clear;
 
+%nm = 'Tjaereborg';
+%lams = exp(linspace (log(2),log(45),50)).';
+%bets = (pi/180)*[-5:45].';
+%W = 2.5;
+
 nm = 'DTU10MW';
-lams = exp(linspace (log(2),log(45),50)).';
-bets = (pi/180)*[-5:45].';
+lams = [0.1 [0.2:0.2:1] 1.2 1.5 [2:1:10] [12:2:20]].';
+bets = (pi/180)*[[-4:2:18] 21 [25:5:90]].';
 W = 1;
+
+%lams = 10;
+%bets = (pi/180)*90;
 
 Nl = size (lams,1);
 Nb = size (bets,1);
@@ -202,7 +210,7 @@ rs = zr(i2a);
 r = [rs(1:Neb);rs(1:Neb);rs(1:Neb)];
 
 %del = eps^0.5;
-dell = 1e-1;
+dell = 1e-2; % 1e-1;
 delb = 1e-2;
 
 ify = [2:6:6*Nel-4].';
