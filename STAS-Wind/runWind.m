@@ -1,256 +1,179 @@
-% 05.08.2017  Complex step dS verified against finite difference.
+% Generate turbulence spectra, including the effects of periodic
+% wind shear and tower shadow.
+%
+% Missing functionality: (See previous STAS Wind versions.)
+% - Tower-blade cross-spectra.
+% - Real/Imaginary spectra for complex-step gradients.
+% - The spectral scaling method for Vinf, W.
 
 clear;
 
-[Nef,Net,Nev,Ner,Nen,Ned,Neh,Neb,icp,       ...
- Nmud,Nwater,Ntow,Nnac,Ndrv,Nbld,           ...
- Lf,Lt,Lv,Lr,Ln,Ld,Lh,Lb,                   ...
- Lel,xis,rhos,EEs,                          ...
- EE,GG,density,viscosity,                   ...
- wnod,rhow,CmA,Cdf0,Cdt0,                   ...
- Diaf,Diat,Diav,Diar,Dian,Diad,             ...
- xia,chord,xpc,foil,aoaz,z0,delta,phi,      ...
- kxg,kyg,kzg,kthzg,cxg,cyg,czg,cthzg,       ...
- Wsched,betaSched,Prated,Trated] = STASTurbine ();
+nm = 'DTU10MW';
+eval(['[s,a] = STASTurbine_'  nm ' ();']);
+load 'xpsi_P060_V100.txt';
+load 'ypsi_P060_V100.txt';
+xpsi = xpsi_P060_V100;
+ypsi = ypsi_P060_V100;
 
-load('-ascii','LTMnorms.txt');
-length = LTMnorms(1);
-time   = LTMnorms(2);
-mass   = LTMnorms(3);
-velocity = length/time;
+[length,time,mass,current,voltage,        ...
+ velocity,force,power,stress,ndens,nvisc, ...
+ stiffness,damping,resistance,inductance, ...
+ capacitance,flux] = getLTMnorms ('LTMnorms.txt');
 
-epsilon = sqrt(eps);
+[idofs,idofm,inods,inodm,Ndof] = getDOFRefs (s);
 
-flagg = 2;  % 0 for no gradient, 
-            % 1 for gradient wrt R, 
-            % 2 for gradient wrt Omega.
+%-------------------------------------------------------------------
+% Inputs:
 
-NN = 3*Neb;
-Nel = Nef + Net + Nev + Ner + Nen + Ned + Neh + 3 + 3*Neb;
+MBCflag = 1;
 
-[nf,df,LCdef] = STASSetup ();
-Nlc = size(LCdef,1);
-
-towerFlag = 1;  % = 1: Include nodes on the tower in the turbulence
-                %      cross-spectra.
-
+Vmag = 10.;
+yaw = 0*pi/180;
+Vinf = [Vmag*cos(yaw);Vmag*sin(yaw);0];
+betas = [0;0;0];
 psi0 = 0;
-chi0 = 0;
 
-Wr = Wsched(size(Wsched,1));
+%TI    = 0.14*(0.75*Vmag + 5.6)./Vmag; % IEC 61400-1 NTM.
+%                                      % Class B, Iref = 0.14.
 
-% Dummy call to get opFlag.
-cpar = STASControl((10/velocity),Wsched,Wr,0,Prated);
-opFlag = cpar(1);
+sigV = 1.;   % Unit variance.
+TI = sigV/Vmag;
 
-Vinfs = LCdef(:,1);
-Vmkss = Vinfs*velocity;
-Pcs   = LCdef(:,2);
-Vdc0s = LCdef(:,3);
-vpd0s = LCdef(:,4);
-we0s  = LCdef(:,5);
-Is    = 0.14*(0.75*Vmkss + 5.6)./Vmkss;  % IEC 61400-1 NTM.
-                                         % Class B, Iref = 0.14.
-Lus   = (180/length)*ones(Nlc,1); % Based on surface roughness length of
-                                  % about 0.01 m.  0.0001: 235, 0.001: 200,
-                                  % 0.01: 175, 0.1: 150.  Intended to
-                                  % represent a turbine deep in a plant.
+%Lu    = (180/length); % Based on surface roughness length of
+%                      % about 0.01 m.  0.0001: 235, 0.001: 200,
+%                      % 0.01: 175, 0.1: 150.  Intended to
+%                      % represent a turbine deep in a plant.
 
-z0 = 0.01/length;        % Surface roughness length for wind shear.
+Lu = 2000;
 
-Ns = 3; % 8;                  % For "normal" wind shear, don't need more than 8 terms, 
-                         % could be even fewer.  For wake-shadow, could use more.
-Nt = 3; % 10;                 % Tower shadow.  Want to preserve maybe 30 terms, but
-                         % 3*Nt*P should not exceed 2*nf*df.
+nnf = 2^9;  % Number of analysis frequencies, 1/4 the total frequencies.
+df = 0.001;
 
+%-------------------------------------------------------------------
 
-Lbel = Lel(Nel-3*Neb+[1:Neb]');
+Pin = assemblePin (s);
+[Tn_y,Th_d,Tb_h] = basicTransforms (s.nacelle.delta,s.driveshaft.phi);
+[q0,P,Ts0B,TB0g] =                                                     ...
+      undeformedPosition (Pin,yaw,s.nacelle.delta,0,s.driveshaft.phi, ...
+                          betas,0,idofs,idofm,inods,inodm);
+Ndj = size(q0,1);
 
-r = zeros(Neb,1);
-r(1) = Lh + 0.5*Lbel(1);
-for iel = 2:Neb
-   r(iel) = r(iel-1) + 0.5*(Lbel(iel) + Lbel(iel-1));
+%-------------------------------------------------------------------
+% Specify the wind shear as a function of height.
+% Elevation, vector pairs.
+Nws = 50;
+z1 = P(idofs(2)+3) - 10;
+z2 = P(idofs(4)+3) + 120;
+zref = P(idofs(4)+3) - z1;
+h0 = 0.01;
+dz = (z2 - z1 - h0)/(Nws - 1);
+zs = h0 + dz*[0:Nws-1].';
+WS = (Vinf.').*log(zs/h0)/log(zref/h0);
+%-------------------------------------------------------------------
+
+ppx = pchip (zs+z1,WS(:,1));
+ppy = pchip (zs+z1,WS(:,2));
+ppz = pchip (zs+z1,WS(:,3));
+
+Nf = 4*nnf;
+dt = 1/(4*nnf*df);
+
+[b1,b2,b3] = MBCindices_Ndj (Ndj,idofs);
+[TpsiB_Ndj,TBpsi_Ndj] = MBC (Ndj,b1,b2,b3,psi0);
+q = TpsiB_Ndj*ypsi(1:Ndj);
+dqdt = TpsiB_Ndj*ypsi(Ndj+[1:Ndj]);
+
+QSflag = 2;
+Sij = buildSij (QSflag,MBCflag,s,a,nnf,df,Vinf,TI,Lu,q,dqdt,P);
+
+Npsi = 2^11;
+psis = (2*pi/Npsi)*[0:Npsi-1].';
+
+[Vavg,vg] = periodicWind (s,a,q,P,psis,ppx,ppy,ppz);
+
+% vg is reported as a function of the azimuth angle psi.  I need
+% this in terms of time, psi/W.
+Omega = ypsi(Ndj+idofs(4)+6);
+
+ts = psis/Omega;
+dt = ts(2) - ts(1);
+P1 = Omega/(2*pi);    % 1P = df = Omega/(2*pi) = 1/(Npsi*dt).
+
+% Also the MBC transform.
+Nel = size(vg,2)/3;
+
+if (MBCflag == 1)
+   TBpsi = zeros (Npsi,9);
+   third = 1/3;
+   cp  = cos (psis);
+   sp  = sin (psis);
+   cp2 = cos (psis + 2*pi/3);
+   sp2 = sin (psis + 2*pi/3);
+   cp3 = cos (psis + 4*pi/3);
+   sp3 = sin (psis + 4*pi/3);
+   TBpsi(:,1) = third;
+   TBpsi(:,2) = 2*third*cp;
+   TBpsi(:,3) = 2*third*sp;
+   TBpsi(:,4) = third;
+   TBpsi(:,5) = 2*third*cp2;
+   TBpsi(:,6) = 2*third*sp2;
+   TBpsi(:,7) = third;
+   TBpsi(:,8) = 2*third*cp3;
+   TBpsi(:,9) = 2*third*sp3;
+   ibl = [[1:Nel];Nel+[1:Nel];2*Nel+[1:Nel]];
+   for iel = 1:Nel  % Note, really iel = icol, indexing the component.
+      ir3 = 3*(iel-1);
+      dat = vg(:,ibl(:,iel)) + Vavg(ibl(:,iel)).';  % Need to include mean.
+      vv = zeros(Npsi,3);
+      vv(:,1) = TBpsi(:,1).*dat(:,1) + TBpsi(:,4).*dat(:,2) ...
+              + TBpsi(:,7).*dat(:,3);
+      vv(:,2) = TBpsi(:,2).*dat(:,1) + TBpsi(:,5).*dat(:,2) ...
+              + TBpsi(:,8).*dat(:,3);
+      vv(:,3) = TBpsi(:,3).*dat(:,1) + TBpsi(:,6).*dat(:,2) ...
+              + TBpsi(:,9).*dat(:,3);
+      Vavg(ibl(:,iel)) = mean(vv).';
+      vg(:,ibl(1,iel)) = vv(:,1) - Vavg(ibl(1,iel));
+      vg(:,ibl(2,iel)) = vv(:,2) - Vavg(ibl(2,iel));
+      vg(:,ibl(3,iel)) = vv(:,3) - Vavg(ibl(3,iel));
+   end
 end
-r3 = [r;r;r];
 
-Ro = r(Neb) + 0.5*Lbel(Neb);
+vgf = fft(vg)/Npsi;
+Nv = size(vg,2);
 
-if (flagg == 1)
-   Ro = Ro + i*epsilon;
-   r = (r/real(Ro))*Ro;
-   r3 = [r;r;r];
-   Lh = (Lh/real(Ro))*Ro;
-   Lb = Ro - Lh;
-   ch = 'R';
-end
+Sper = zeros (Npsi,Nv^2);
+for iv = 1:Nv
 
-Dia = 2*Ro;
-
-
-
-if (towerFlag == 1)
-
-   [Ogy_g,Oyd_y,Odp_d,Ogs_g,Oys_y,Ods_d,Ops_p] =     ...
-      nodalOrigins (Nef,Net,Nev,Ner,Nen,Ned,Neh,Neb, ...
-                    delta,Lf,Lt,Lv,Lr,Ln,Ld,Lh,Lb,Lel);
-
-   [Tn_y,Th_d,Tb_h] = buildBasicTransforms (delta,phi);
-
-   zet_g = zeros(Net,1);
-   zn1 = 0;
-   zn2 = Lel(Nef+1);
-   for iel = 1:Net
-      zet_g(iel) = 0.5*(zn1 + zn2);
-      zn1 = zn1 + Lel(Nef+iel);
-      zn2 = zn2 + Lel(Nef+iel+1);
-   end
-
-end
-
-for ilc = 1:Nlc
-
-   Vinf = Vinfs(ilc);
-   Pc   = Pcs(ilc);
-   Vdc0 = Vdc0s(ilc);
-   vpd0 = vpd0s(ilc);
-   we0  = we0s(ilc);
-   I    = Is(ilc);
-   Lu   = Lus(ilc);
-
-   Vmks = Vinf*velocity;
-
-   % Find the operating rotor speed Wop.
-   Vlo = floor(Vmks);
-   Vhi = ceil(Vmks);
-   if (Vlo == Vhi)
-      ilo = Vlo - 3;
-      Wnom = Wsched(ilo);
-      bnom = betaSched(ilo);
-   else
-      f = Vmks - Vlo;
-      ilo = Vlo - 3;
-      ihi = Vhi - 3;
-      Wnom = (1-f)*Wsched(ilo) + f*Wsched(ihi);
-      bnom = (1-f)*betaSched(ilo) + f*betaSched(ihi);
-   end
-
-   [Pnom,Pop,Wop,bop,Fapop,Virop] =                ...
-             steadyOp (opFlag,Pc,Prated,Trated,    ...
-                       Neb,Vinf,Wnom,bnom,Wr,      ...
-                       psi0,Dia,density,viscosity, ...
-                       Vdc0,vpd0,we0,              ...
-                       xia,r,Lbel,chord,xpc,foil);
-
-   ify = [2:6:6*NN-4]';
-   ifz = [3:6:6*NN-3]';
-   Fz = -Fapop(ify)*sin(bop(1)) + Fapop(ifz)*cos(bop(1));
-   Ft = Fapop(ify)*cos(bop(1)) + Fapop(ifz)*sin(bop(1));
-
-   Thrust = sum(Fz);
-   Torque = sum(r3.*Ft);
-   Pmech = Wop*Torque;
-   beta0 = [bop;bop;bop];
-
-real([Vinf Pnom Pop Pmech Torque Thrust Wop bop])
-
-   if (flagg == 2)
-      % Directly scaling W does not work, because this doesn't
-      % correctly represent the "rolling" of the spectral peaks
-      % along the frequency axis, as W changes.  Rather, scale
-      % the time variable such that it follows W.  This implies
-      % that W stays the same and the input Vinf gets scaled.
-      % But only the convection velocity.  The amplitude of the
-      % turbulent eddies should stay the same, so increase I
-      % accordingly.
-%      Wop = Wop + i*epsilon;
-%      ch = 'W';
-      Vinf = Vinf + i*epsilon;
-      I = I*real(Vinf)/Vinf;
-      ch = 'V';
-   end
-
-   [SpsiR,SpsiI] = mbcSij (Neb,nf,df,Vinf,I,Lu,Wop,r3,psi0);
-
-   Vzrp = Vinf*ones(Neb,1);
-
-   [SperR,SperI] =                                                   ...
-          periodicWind (Nef,Net,Nev,Ner,Nen,Ned,Neh,Neb,Nmud,Nwater, ...
-                        Lf,Lt,Lv,Lr,Ln,Ld,Lh,Lb,                     ...
-                        Ns,Nt,Lel,Diaf,Diat,delta,phi,df,            ...
-                        Wop,z0,Vinf,Vzrp);
-
-   % The periodic wind terms contribute to 3nP multiples of the
-   % rotational frequency.  It's a matter of finding the right
-   % rows and columns in the Spsi matrix.
-   frot = 3*(Wop/(2*pi))*[[-size(SperR,1):-1] [1:size(SperR,1)]].';
-   f = df*[-2*nf+1:2*nf].';
-   ir = interp1(f,[[2*nf+1:4*nf] [1:2*nf]].',real(frot),'nearest');
-   ic = [1:4:4*((3*Neb)^2) - 3];
-
-   % Eliminate phase information in the periodic signal.  In general, we
-   % know its strength, but its phase would depend on the starting 
-   % azimuth, which is not permissible for stochastic analysis.  Rather,
-   % we preserve the strength of the signal and neglect the relative phase.
-   SpsiR(ir,ic) = SpsiR(ir,ic) ...
-                + sqrt(([SperR(size(SperR,1):-1:1,:);SperR]).^2 ...
-                +      ([SperI(size(SperI,1):-1:1,:);SperI]).^2);
-
-   clear SperR SperI;
-
-   % Now compute and save the nominal spectra.
-   Spsi    = zeros(size(SpsiR),'single');
-   Spsi(:) = real(SpsiR);
-   Spsi    = Spsi + i*real(SpsiI);
-
-   % Memory management: we no longer need the real parts of SpsiR and
-   % SpsiI.  Store the imaginary parts in SpsiI.
-   SpsiI = imag(SpsiR) + i*imag(SpsiI);
-   clear SpsiR;
-
-   % Float halves the file size, and a comparison indicates no meaningful
-   % difference in the results.
-   txt = ['_D' int2str(10*Dia)                              ...
-          '_V'  int2str(100*Vinf) '_I' int2str(1000*I)      ...
-          '_Lu' int2str(Lu)       '_df' int2str(10000*df)   ...
-          '_nf' int2str(nf)       '_W'  int2str(Wop*1000) '.bin'];
-   save('-float-binary',['Spsi' txt],'Spsi');
-
-   clear Spsi;
-
-   if (flagg ~= 0)
-      % The derivative wrt the selected parameter.  Use duplicate 
-      % variables to avoid memory limitations.  Note that SpsiI
-      % has been redefined such that it is the real and imaginary
-      % part of the complex step perturbation.
-      dS    = zeros(size(SpsiI),'single');
-      dS(:) = SpsiI/epsilon;
-      save('-float-binary',['dSd' ch txt],'dS');
-      clear dS SpsiI;
-   end
-
-   if (towerFlag == 1)
-
-      % Find the transforms which may be dependent on Vinf.
-      [Ty_g,Td_n,Tp_b] = buildJointTransforms (chi0,psi0,beta0);
-      Tg_r = (Tn_y.')*(Ty_g.');
-
-      sgr_g = Ogy_g + Ty_g*(Oyd_y + Tn_y*Td_n*[0;0;Odp_d(3)]);
-
-      [SpsiTR,SpsiTI] = mbcSijTower (Neb,Net,nf,df,Vinf,I,Lu,Wnom, ...
-                                     r3,zet_g,sgr_g,Tg_r,Ty_g,psi0);
-
-      SpsiTower = real(SpsiTR) + i*real(SpsiTI);
-      save('-float-binary',['SpsiTower' txt],'SpsiTower');
-      clear SpsiTower;
-
-      if (flagg ~= 0)
-         dSTower = (imag(SpsiTR) + i*imag(SpsiTI))/epsilon;
-         save('-float-binary',['dSTowerd' ch txt],'dSTower');
-         clear dSTower;
-      end
-
-   end
+   icol = Nv*(iv-1);
+   Sper(:,icol+[1:Nv]) = vgf.*conj(vgf(:,iv))/df;
 
 end
+
+% Store the spectra according to the actual frequencies, not multiples
+% of the rotor frequency.
+ipf = round(([0:Npsi/2-1].')*P1/df);
+jpf = ipf<(Nf/2-1);
+ipfr = ipf(jpf) + 1;
+
+Sijp = sparse(Nf,Nv^2);
+Sijp(ipfr,:) = Sper(jpf,:);
+
+temp = vgf;
+vgf = sparse(Nf,Nv);
+vgf(ipfr,:) = temp(jpf,:);
+
+jpsi = [-Npsi/2:-1].';
+ipf = round(jpsi*P1/df);
+jpf = ipf>(-Nf/2);
+ipfr = ipf(jpf);
+Sijp(Nf+ipfr+1,:) = Sper(Npsi+jpsi(jpf)+1,:);
+vgf(Nf+ipfr+1,:) = temp(Npsi+jpsi(jpf)+1,:);
+
+cvg = vgf;
+
+save ('-float-binary','Sij.bin','Sij');
+save ('-float-binary','Sijp.bin','Sijp');
+save ('-float-binary','cvg.bin','cvg');
+save ('-float-binary','Vavg.bin','Vavg');
 
 
