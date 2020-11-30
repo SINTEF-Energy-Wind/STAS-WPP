@@ -1,16 +1,15 @@
-[Nef,Net,Nev,Ner,Nen,Ned,Neh,Neb,           ...
- Nmud,Nwater,Ntow,Nnac,Ndrv,Nbld,           ...
- Lf,Lt,Lv,Lr,Ln,Ld,Lh,Lb,                   ...
- Lel,xis,rhos,EEs,                          ...
- EE,GG,density,viscosity,                   ...
- wnod,rhow,CmA,Cdf0,Cdt0,                   ...
- Diaf,Diat,Diav,Diar,Dian,Diad,             ...
- xia,chord,xpc,foil,aoaz,z0,delta,phi,      ...
- kxg,kyg,kzg,kthzg,cxg,cyg,czg,cthzg,       ...
- Wsched,betaSched,Prated,Trated] = STASTurbine ();
+clear;
+
+nm = 'DTU10MW';
+eval(['[s,a] = STASTurbine_'  nm ' ();']);
+
+Nmud = s.foundation.Nmud;
+Nwater = s.foundation.Nwater;
+Lel = s.foundation.Lel;
+Diaf = s.foundation.D;
 
 depth = sum(Lel(Nmud+1:Nmud+Nwater));
-Nnod = Nwater + 6;         % Extend to the base of the tower.
+Nnod = s.foundation.Nnod - Nmud;
 znod = zeros(Nnod,1);  
 znod(1) = -depth;
 for inod = 2:Nnod
@@ -49,10 +48,11 @@ Tp = 1 + [[1:16]';[1:18]';[2:18]';[2:17]';   ...
 
 
 % A single analysis...
-Hs = 2.0;
-Tp = 6.0;
-Nf = 2048;
-df = 0.002;
+Hs = 4.0;
+Tp = 8.0;
+Nf = 2^12;
+df = 0.001;
+rhow = 1025;
 
 
 Nwave = size(Hs,1);
@@ -74,12 +74,19 @@ dt = 1/(Nf*df);
 f = [df:df:(Nf/2)*df]';  % For sampling the one-sided wave spectrum.
 t = [0:dt:(Nf-1)*dt]';
 
+Niter = 20;
 for iw = 1:Nwave
+
+printf('Case %6d of %6d\n',iw,Nwave);
+fflush(stdout);
 
    % Take the average over a fairly large number of iterations in order
    % to smooth the spectrum.  Random numbers are employed in these
    % calculations.
-   for iter = 1:20
+   for iter = 1:Niter
+
+printf('Iteration %6d of %6d\n',iter,Niter);
+fflush(stdout);
 
       F = waveForce (Hs(iw),Tp(iw),Vc,depth,rhow,f,theta,z,t,znod,Dnod);
 
