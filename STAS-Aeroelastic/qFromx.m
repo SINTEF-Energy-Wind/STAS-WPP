@@ -69,27 +69,56 @@ Ns    = 100;         % no iteration occurs in the complex step case...
 conv  = 0;           % [Perhaps fixed with iter <= 1 criterion.]
 iter  = 0;
 Niter = 0;
+litmax = 20;
 Rval  = 1;
+lam = 1;
 while ((iter <= 1) || ((real(Rval) > cnv) && (iter <= Ns)))
    iter   = iter + 1;
+
+   % Compute the tangent function at the latest point.
    q(slv) = qs;
    [Lambda,L,C,jnkret,jnkslv] = constraints (q,P,Tb_h,idofs,idofm);
+   if (iter == 1)
+      Rval = max(abs(C));
+   end
    Ls     = L(:,slv);
    dqs    = -Ls\C;
-   qs     = qs + bta*dqs;
-%   Rval   = max(abs(real(C)));  % Does not work with complex step.
-   Rval   = max(abs(C));  % Works with complex step.
+   lflg = 0;
+   liter = 0;
+   if (lam <= 0.5)
+      lam = 2*lam;
+   else
+      lam = 1;
+   end
+   while ((lflg == 0) && (liter < litmax))
+      liter = liter + 1;
+      qs1 = qs + bta*lam*dqs;
+      q1 = q;
+      q1(slv) = qs1;
+      [Lambda,L,C,jnkret,jnkslv] = constraints (q1,P,Tb_h,idofs,idofm);
+%     R1 = max(abs(real(C)));  % Does not work with complex step.
+      R1 = max(abs(C));        % Works with complex step.
+      if (real(R1) < real(Rval))
+         % OK!  Prepare for the next iteration.
+         lflg = 1;
+         Rval = R1;
+         qs = qs1;
+      else
+         % Backtrack.
+         lam = 0.5*lam;
+         if (liter == litmax)
+            [iter R1 Rval]
+            printf('Warning, qFromx proceeding without lambda convergence.\n');
+            fflush(stdout);
+            lflg = 1;
+            Rval = R1;
+            qs = qs1;
+         end
+      end
+   end
 end
 
 % Assemble dq/dt slave DOFs.
 mLsL = Lambda(Nret+[1:Nslv],:);
 dqdt(slv) = mLsL*dqdt(ret);
 
-%'qFromx'
-%printVec(shape(:,7))
-%[iter Rval]
-%[q dqdt]
-
-%fid = fopen('qfx.txt','a');
-%fprintf(fid,'%6d %+5.6e\n',iter,Rval);
-%fclose(fid);
