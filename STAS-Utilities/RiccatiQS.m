@@ -1,29 +1,28 @@
-function pdot = RiccatiQS (p,t)
+function [Pdot,dRic] = RiccatiQS (linFlag,Pin,A,B,Q,R)
 
+N = size(Pin,1);
 
+P = 0.5*(Pin + Pin.');
+AT = A.';
+BRiB = B*balanceDiv(R,(B.'));
+Pdot = P*A + AT*P - P*BRiB*P + Q;
+BRiBP = BRiB*P;
+PBRiB = P*BRiB;
 
-% CAUTION, NOT ADAPTED FOR COMPLEX STEP DERIVATIVES.
+dRic = sparse(N^2,N^2);
+if (linFlag == 1)
 
+   for ii = 1:N
+      irn = N*(ii-1);
+      for jj = 1:N
+         jcn = N*(jj-1);
+         icol = jj + N*(ii-1);
+         mat = sparse(N,N);
+         mat(jj,:) = A(jj,:) - BRiBP(jj,:);
+         mat(:,ii) = mat(:,ii) + AT(:,ii) - PBRiB(:,ii);
+         dRic(:,icol) = reshape(mat,N^2,1);
+      end
+   end   
 
-
-global AA_Ric BC_Ric QQ_Ric RR_Ric
-
-N = sqrt(size(p,1));
-
-Pmat = zeros(N,N);
-for jj = 1:N
-   ind = N*(jj-1);
-   Pmat(:,jj) = p(ind+[1:N]);
 end
 
-Pmat = 0.5*(Pmat + Pmat.');
-RinvBCP = balanceDiv(RR_Ric,(BC_Ric.')*Pmat);
-
-Pmdot = Pmat*AA_Ric + (AA_Ric.')*Pmat - Pmat*BC_Ric*RinvBCP + QQ_Ric;
-
-% Real: prevent small imaginary residuals from triggering warnings.
-pdot = zeros(N^2,1);
-for jj = 1:N
-   ind = N*(jj-1);
-   pdot(ind+[1:N]) = real(Pmdot(:,jj));
-end
