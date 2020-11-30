@@ -12,7 +12,7 @@ function [dxdt,A,B] = connectGrid (linFlag,x,u,p,nod)
 %             vd,q
 %
 %   For each bus:
-%             ird,q             ied,q       (External current leaving bus.)
+%             ird,q             ied,q       (External current entering bus.)
 %
 % Version:        Changes:
 % --------        -------------
@@ -61,9 +61,11 @@ for icab = 1:Ncab
 
    ic2 = 2*(icab-1);
 
-   dxdt(ixi+ic2+[1:2]) = -(we*spn + (R(icab)/L(icab))*speye(2))*x(ixi+ic2+[1:2]) ...
-                       + (x(ixv+2*nod(1,icab)+[-1:0])                            ...
-                       -  x(ixv+2*nod(2,icab)+[-1:0]))/L(icab);
+   if (L(icab) > 0)
+      dxdt(ixi+ic2+[1:2]) = -(we*spn + (R(icab)/L(icab))*speye(2))*x(ixi+ic2+[1:2]) ...
+                          + (x(ixv+2*nod(1,icab)+[-1:0])                            ...
+                          -  x(ixv+2*nod(2,icab)+[-1:0]))/L(icab);
+   end
 
 end
 
@@ -76,14 +78,18 @@ for inod = 1:Nnod
 
    ind1 = (nod(1,:) == inod).';
    ind2 = (nod(2,:) == inod).';
-   
-   dxdt(ixv+ic2+[1:2]) = -we*spn*x(ixv+ic2+[1:2])                ...
-                       + (-[sum(x(i2a(ind1)));sum(x(i2b(ind1)))] ...
-                       +   [sum(x(i2a(ind2)));sum(x(i2b(ind2)))] ...
-                       +  u(iue+ic2+[1:2]))/C(inod);
 
-   dxdt(ixr+ic2+[1:2]) = -(we*spn + (Rr(inod)/Lr(inod))*speye(2))*x(ixr+ic2+[1:2]) ...
-                       + x(ixv+ic2+[1:2])/Lr(inod);
+   if (C(inod) > 0)
+      dxdt(ixv+ic2+[1:2]) = -we*spn*x(ixv+ic2+[1:2])                ...
+                          + (-[sum(x(i2a(ind1)));sum(x(i2b(ind1)))]  ...
+                          +   [sum(x(i2a(ind2)));sum(x(i2b(ind2)))]  ...
+                          +  u(iue+ic2+[1:2]))/C(inod);
+   end
+
+   if (Lr(inod) > 0)
+      dxdt(ixr+ic2+[1:2]) = -(we*spn + (Rr(inod)/Lr(inod))*speye(2))*x(ixr+ic2+[1:2]) ...
+                          + x(ixv+ic2+[1:2])/Lr(inod);
+   end
 
 end
 
@@ -98,15 +104,17 @@ if (linFlag == 1)
 
       ic2 = 2*(icab-1);
 
-      ir = ixi + ic2 + [1:2];
-      ic = ir;
-      A(ir,ic) = -(we*spn + (R(icab)/L(icab))*speye(2));
-      ic = ixv+2*nod(1,icab)+[-1:0];
-      A(ir,ic) = A(ir,ic) + speye(2)/L(icab);
-      ic = ixv+2*nod(2,icab)+[-1:0];
-      A(ir,ic) = A(ir,ic) - speye(2)/L(icab);
-      ic = 1;
-      B(ir,ic) = -spn*x(ixi+ic2+[1:2]);
+      if (L(icab) > 0)
+         ir = ixi + ic2 + [1:2];
+         ic = ir;
+         A(ir,ic) = -(we*spn + (R(icab)/L(icab))*speye(2));
+         ic = ixv+2*nod(1,icab)+[-1:0];
+         A(ir,ic) = A(ir,ic) + speye(2)/L(icab);
+         ic = ixv+2*nod(2,icab)+[-1:0];
+         A(ir,ic) = A(ir,ic) - speye(2)/L(icab);
+         ic = 1;
+         B(ir,ic) = -spn*x(ixi+ic2+[1:2]);
+      end
 
    end
 
@@ -117,32 +125,37 @@ if (linFlag == 1)
       ind1 = (nod(1,:) == inod).';
       ind2 = (nod(2,:) == inod).';
 
-      ir = ixv+ic2+[1:2];
-      ic = ir;
-      A(ir,ic) = A(ir,ic) - we*spn;
-      ir = ixv+ic2+1;
-      ic = i2a(ind1);
-      A(ir,ic) = A(ir,ic) - ones(1,sum(ind1))/C(inod);
-      ic = i2a(ind2);
-      A(ir,ic) = A(ir,ic) + ones(1,sum(ind2))/C(inod);
-      ir = ixv+ic2+2;
-      ic = i2b(ind1);
-      A(ir,ic) = A(ir,ic) - ones(1,sum(ind1))/C(inod);
-      ic = i2b(ind2);
-      A(ir,ic) = A(ir,ic) + ones(1,sum(ind2))/C(inod);
-      ir = ixv+ic2+[1:2];
-      ic = iue+ic2+[1:2];
-      B(ir,ic) = B(ir,ic) + speye(2)/C(inod);
-      ic = 1;
-      B(ir,ic) = B(ir,ic) - spn*x(ixv+ic2+[1:2]);
+      if (C(inod) > 0)
+         ir = ixv+ic2+[1:2];
+         ic = ir;
+         A(ir,ic) = A(ir,ic) - we*spn;
+         ir = ixv+ic2+1;
+         ic = i2a(ind1);
+         A(ir,ic) = A(ir,ic) - ones(1,sum(ind1))/C(inod);
+         ic = i2a(ind2);
+         A(ir,ic) = A(ir,ic) + ones(1,sum(ind2))/C(inod);
+         ir = ixv+ic2+2;
+         ic = i2b(ind1);
+         A(ir,ic) = A(ir,ic) - ones(1,sum(ind1))/C(inod);
+         ic = i2b(ind2);
+         A(ir,ic) = A(ir,ic) + ones(1,sum(ind2))/C(inod);
+         ir = ixv+ic2+[1:2];
+         ic = iue+ic2+[1:2];
+         B(ir,ic) = B(ir,ic) + speye(2)/C(inod);
+         ic = 1;
+         B(ir,ic) = B(ir,ic) - spn*x(ixv+ic2+[1:2]);
 
-      ir = ixr+ic2+[1:2];
-      ic = ir;
-      A(ir,ic) = A(ir,ic) - we*spn - (Rr(inod)/Lr(inod))*speye(2);
-      ic = ixv+ic2+[1:2];
-      A(ir,ic) = A(ir,ic) + speye(2)/Lr(inod);
-      ic = 1;
-      B(ir,ic) = B(ir,ic) - spn*x(ixr+ic2+[1:2]);
+      end
+
+      if (Lr(inod) > 0)
+         ir = ixr+ic2+[1:2];
+         ic = ir;
+         A(ir,ic) = A(ir,ic) - we*spn - (Rr(inod)/Lr(inod))*speye(2);
+         ic = ixv+ic2+[1:2];
+         A(ir,ic) = A(ir,ic) + speye(2)/Lr(inod);
+         ic = 1;
+         B(ir,ic) = B(ir,ic) - spn*x(ixr+ic2+[1:2]);
+      end
 
    end
 
