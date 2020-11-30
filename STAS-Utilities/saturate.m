@@ -35,7 +35,7 @@ xa3 = xa2*xa;
 xb2 = xb^2;
 xb3 = xb2*xb;
 
-smin = 0.05;
+smin = 0.0;  % 0.05;
 
 ind = (real(u) <= -xb);
 y(ind) = -1 + smin*(u(ind) + xb);
