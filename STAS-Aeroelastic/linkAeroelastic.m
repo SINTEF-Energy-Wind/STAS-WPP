@@ -12,8 +12,8 @@ function [LHS,A,Bu,By,C,Du,Dy] =                                    ...
 %
 %   States:              y vector:             u vector:
 % ----------------------- Structure --------------------------
-%   eta        N         q         Ndj         F          Ndj
-%   deta/dt    N         dq/dt     Ndj
+%   eta      Neta        q         Ndj         F          Ndj
+%   deta/dt  Neta        dq/dt     Ndj         d2eta/dt2  Neta
 %                        d2q/dt2   Ndj
 %                        xng     3*Nnod
 %                        vng     6*Nnod
@@ -58,10 +58,13 @@ function [LHS,A,Bu,By,C,Du,Dy] =                                    ...
 % Version:        Changes:
 % --------        -------------
 % 12.04.2018      Original code.
+% 22.01.2020      Minor modifications to account for d2eta/dt2 as
+%                 part of the u vector.
 %
 % Version:        Verification:
 % --------        -------------
 % 12.04.2018      
+% 22.01.2020      
 %
 % Inputs:
 % -------
@@ -113,11 +116,11 @@ LHS(1:Nxs,1:Nxs)   = lls;
   A(1:Nxs,1:Nxs)   = aas;
  Bu(1:Nxs,1:Nus)   = bbus;
  By(1:Nxs,1:Nys1)  = bbys;
- By(1:Nxs,Nys1+9*Nnod+[1:Ndj]) = bbus;   % Aero forces in y vector.
+ By(1:Nxs,Nys1+9*Nnod+[1:Ndj]) = bbus(:,1:Ndj);  % Aero forces in y vector.
   C(1:Nys1,1:Nxs)  = ccs;
  Du(1:Nys1,1:Nus)  = ddus;
  Dy(1:Nys1,1:Nys1) = ddys;
- Dy(1:Nys1,Nys1+9*Nnod+[1:Ndj]) = ddus;  % Aero forces in y vector.
+ Dy(1:Nys1,Nys1+9*Nnod+[1:Ndj]) = ddus(:,1:Ndj); % Aero forces in y vector.
 
 LHS(Nxs+[1:Nxa],Nxs+[1:Nxa]) = lla;
   A(Nxs+[1:Nxa],Nxs+[1:Nxa]) = aaa;
@@ -281,4 +284,11 @@ for icomp = 1:6
 
 end
 
-
+% Link input forces to output forces, so that these represent the
+% full force vector.  Zero the direct link between input forces
+% and the equations of motion.  When the matrices are linked
+% later, this will nonetheless produce the correct B matrix.
+indr = 3*Ndj + 9*Nnod+ [1:Ndj].';
+indc = [1:Ndj].';
+Du(indr,indc) = speye(Ndj);
+Bu(1:Nxs,indc) = sparse(Nxs,Ndj);
