@@ -7,10 +7,13 @@ function dQhF = dQhdqF (qq,PP,FF,idofs,inods)
 % Version:        Changes:
 % --------        -------------
 % 24.11.2017      Original code.
+% 27.01.2020      Fixed an error, adding the "if" statement before
+%                 the second idof loop.
 %
 % Version:        Verification:
 % --------        -------------
 % 24.11.2017      Linearization verified by complex step.
+% 27.01.2020      Linearization verified by complex step on all DOFs.
 %
 % Inputs:
 % -------
@@ -99,19 +102,23 @@ for ibod = 1:Nbod
 
       end
 
-      for idof = 1:6  % Now the qn columns of Kf.
+      if (noddof ~= idref)
 
-         icol = noddof + idof;  % The column index of Kf.
-         ic12 = 12*(idof+6-1);  % Indexes the derivative of qB.  Derivatives 7-12.
+         for idof = 1:6  % Now the qn columns of Kf.
 
-         % The qB rows.
-         rows = idref + [1:6].';
-         dQhF(rows,icol) = dQhF(rows,icol) + (dQ(:,ic12+[1:6]).')*Fn;
+            icol = noddof + idof;  % The column index of Kf.
+            ic12 = 12*(idof+6-1);  % Indexes the derivative of qB.  Derivatives 7-12.
 
-         % Then the qn rows, if this is not the reference node.
-         if (noddof ~= idref)
-            rows = noddof + [1:6];
-            dQhF(rows,icol) = dQhF(rows,icol) + (dQ(:,ic12+[7:12]).')*Fn;
+            % The qB rows.
+            rows = idref + [1:6].';
+            dQhF(rows,icol) = dQhF(rows,icol) + (dQ(:,ic12+[1:6]).')*Fn;
+
+            % Then the qn rows, if this is not the reference node.
+            if (noddof ~= idref)
+               rows = noddof + [1:6];
+               dQhF(rows,icol) = dQhF(rows,icol) + (dQ(:,ic12+[7:12]).')*Fn;
+            end
+
          end
 
       end
