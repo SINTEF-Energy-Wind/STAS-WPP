@@ -1,22 +1,36 @@
-function [xs,etas,q,dq,d2q,P,shape,sh2,freq,mdamp,ret,slv, ...
-          Ndj,Nnod,Neta] = structInit (s,yaw,psi,betas,Omega,modeflag)
+function [xs,etas,q,qd,qdd,P,shape,freq,mdamp,ret,slv, ...
+          Ndj,Nnod,Neta] = structInit (s,yaw,psi,betas,Omega)
 %
 % Initialize parameters related to the structural model.
+%
+% The mode shape calculation should ideally include centrifugal
+% stiffening, but this requires solving for the displaced position
+% of the blade under the rotational acceleration field.
+% - start the rotor spinning
+% - isolate one of the blades, fix its root
+% - compute the nonlinear steady-state solution
+% - compute the eigenmodes.
+% This is left to a future implementation.  Note that the primary
+% purpose of the modal reduction is to prevent very high-frequency
+% structural modes from making system matrices ill-conditioned.
+% A modal reduction based on static-blade modes, although not
+% ideal, is sufficient for this purpose.
 %
 % Version:        Changes:
 % --------        -------------
 % 25.04.2018      Original code.
+% 25.01.2020      Accommodate updated buildMRQ.
 %
 % Version:        Verification:
 % --------        -------------
 % 25.04.2018      
+% 25.01.2020      
 %
 % Inputs:
 % -------
 % s               : Data structure.
-% yaw,psi,betas   : Yaw, azimuth, blade pitch angles.
+% yaw,psi,betas   : Yaw, azimuth, blade pitch angles that 
 % Omega           : Rotor speed.
-% modeflag        : 1 for structural modes, 0 for full DOFs.
 %
 % Outputs:
 % --------
@@ -39,47 +53,38 @@ Pin = assemblePin (s);
 [q,P,Ts0_B,TB0_g] =                                                      ...
       undeformedPosition (Pin,yaw,s.nacelle.delta,psi,s.driveshaft.phi, ...
                           betas,0,idofs,idofm,inods,inodm);
-
-% Initial velocity considering rotor rotation; this fills in the 
-% state vector for structural DOFs, xs, including both positions and
-% velocities.  xs includes the nominal constraint equations, but not
-% locked joints or modal DOF reduction.
-[xs,dq,ret,slv] = initialDOFVelocity (s,q,P,Omega);
-
-% Ndj: the total number of structural DOFs, including the six joint
-% DOFs.
 Ndj  = size(q,1);
+
+% Initial velocity considering rotor rotation.
+[xs,qd,ret,slv] = initialDOFVelocity (s,q,P,Omega);
 Nret = size(ret,1);
-Nslv = size(slv,1);
 
-% Initial accelerations can be obtained via structureNL outputs.
-% We don't yet know the applied forces, let these be zero.  The 
-% output of structureNL is the initial y vector for the structural
-% DOFs.
-%
-% [Caution, this won't work properly with s.zdamp; not an issue
-%  here if we don't use d2q.]
+% We don't yet know the applied forces, let these be zero.  The
+% DOF accelerations should be set to zero for the initial body mode
+% calculation.  (After a static solution to the state equations is
+% available the body modes may be recomputed so as to include
+% centrifugal stiffening and other effects.)
+F     = zeros(Ndj,1);
+grav  = zeros(3,1);
+qdd   = zeros (Ndj,1); % Zero acceleration for computing body modes.
 
-Force = zeros(Ndj,1);
-%[Lms,Rvs,ys] = structureNL (xs,0,s,P,Force,speye(Nret),sparse(Nret,1), ...
-%                            ret,slv,q(slv));
-d2q = zeros (Ndj,1); % ys(2*Ndj+[1:Ndj]);  % Zero acceleration for
-                                           % computing body modes.
+% Get the unconstrained matrices.
+[M,G,H,C,K,Q,dM,dMg,dG,dGd,dH,dHd,dC,dCd,dK,dQ,dQd] = ...
+                     buildMRQ (1,s,q,qd,qdd,P,F,grav);
+KK = dG - dH + dK;  % Should dG and dH be included, since the static
+                    % solution has not been obtained?
 
-if (modeflag == 1)
-   % And get the mode shapes.
-   [M,dM,MG,dMG,dMGd,R,dR,dRd,Q,dQ,dQd,slv,ret, ...
-    Lambda,Gamma,Leq,dLdq,dL,dGam,dGamd] =      ...
-                       buildMRQLin (s,q,dq,d2q,P,Force);
-   K = dM + dMG - dR - dQ;
-   [shape,freq,mdamp] = bodyModes (s,M,K,ret,slv);
-   Neta = size(shape,2);
-elseif (modeflag == 0)
-   shape = speye (Nret);
-   freq  = zeros (Nret,1);
-   mdamp = zeros (Nret,1);
-   Neta  = Nret;
-end
+% Constrain.
+qh   = xs(1:Nret);
+qhd  = xs(Nret+[1:Nret]);
+qhdd = qdd(ret);
+[q,qd,qdd,Tqhq,dTdq,dTdqd] = buildTqhq (0,s,qh,qhd,qhdd,P,ret,slv);
+T = Tqhq(Ndj+[1:Ndj],Nret+[1:Nret]);
+Mr   = (T.')*M*T;
+Kr   = (T.')*KK*T;
+
+[shape,freq,mdamp] = bodyModes (s,Mr,Kr,ret,slv);
+Neta = size(shape,2);
+
 sh2 = [shape sparse(Nret,Neta);sparse(Nret,Neta) shape];
-
-etas = (sh2.')*xs;
+etas = (sh2.')*xs;  % Best estimate.
