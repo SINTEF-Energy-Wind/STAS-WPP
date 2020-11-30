@@ -35,8 +35,7 @@ function [dxadt,A,By,C,Dy,Psi] = aeroLin (psiFlag,xa,Vg,s,a,q,dqdt,P,bsh)
 %                     Lp        135
 %                     z         136
 %                     f         137
-% (psiFlag = 1: repeat the above consecutively for each blade element
-%               in an annulus.)
+% (Repeat the above consecutively for each blade element.)
 %                     Azi       (1)
 %                     W         (1)
 %                     Dp        (3)
@@ -96,7 +95,7 @@ Dy  = spalloc (Ny,Ny,400*Nel);
 [Tar,Trg,TB0g,TsB,TBB0,dTar,dTsB,dTBB0,wg] = ...
                   BEMprepTransforms (s,a,q,dqdt,P,Tas);
 [zr,Area,Dp,rp,Lp,xeg,xhg,xyg] = ...
-                  BEMprepProjections (s,a,q,dqdt,P,Tn_y,Trg);
+                  BEMprepProjections (s,a,q,P,Tn_y,Trg);
 Dps = zeros(Nel,1);
 Dps(1:Neb)         = Dp(1);
 Dps(Neb+[1:Neb])   = Dp(2);
