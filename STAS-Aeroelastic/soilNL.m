@@ -111,47 +111,4 @@ for inod = 1:Nnod
    dthzdt =  dthdx*dxdt + dthdy*dydt;
    F(ic6+[4:6]) = F(ic6+[4:6]) - TF0F*[0 0 cthz(inod)*dthzdt].';
 
-%{
-% Debug report.
-fid = fopen ('soilNLDebug.txt','a');
-fprintf(fid,'----------------------------------------------\n');
-fprintf(fid,'inod %6d\n',inod);
-fprintf(fid,'PB Pn qB qn dqndt\n');
-for jj = 1:6
-   fprintf(fid,'%12.4f %12.4f %12.4f %12.4f %12.4f\n', ...
-           PB(jj),Pn(jj),qB(jj),qn(jj),dqn(jj));
-end
-fprintf(fid,'Stiffness forces due to qB\n');
-val = -TF0F*Kd*TgF0*qB(1:3);
-fprintf(fid,'%12.1f %12.1f %12.1f\n',val(1),val(2),val(3));
-fprintf(fid,'Stiffness forces due to TFF0 and Pn\n');   % CHECK Z COMPONENT.
-val = -TF0F*Kd*(TFF0*Pn(1:3) - Pn(1:3));
-TFF0*Pn(1:3)
-Pn(1:3)
-TFF0*Pn(1:3)-Pn(1:3)
-TF0F*Kd
-val
-fprintf(fid,'%12.1f %12.1f %12.1f\n',val(1),val(2),val(3));
-fprintf(fid,'Stiffness forces due to qn\n');
-val = -TF0F*Kd*TFF0*qn(1:3);
-fprintf(fid,'%12.1f %12.1f %12.1f\n',val(1),val(2),val(3));
-fprintf(fid,'Damping forces due to dqBdt\n');
-val = -TF0F*Cd*TgF0*dqB(1:3);
-fprintf(fid,'%12.1f %12.1f %12.1f\n',val(1),val(2),val(3));
-fprintf(fid,'Damping forces due to dqndt\n');
-val = -TF0F*Cd*TFF0*dqn(1:3);
-fprintf(fid,'%12.1f %12.1f %12.1f\n',val(1),val(2),val(3));
-fprintf(fid,'Damping forces due to dTFF0/dt\n');
-for jj = 1:3
-   jc3 = 3*(jj-1);
-   val = - TF0F*Cd*dTFF0(:,jc3+[1:3])*(Pn(1:3) + qn(1:3))*dqB(3+jj);
-   fprintf(fid,'%12.1f %12.1f %12.1f\n',val(1),val(2),val(3));
-end
-fprintf(fid,'Moment due to torsion\n');
-val = -Tn0F*([kthz(inod)*thz 0 0].');
-fprintf(fid,'%12.1f %12.1f %12.1f\n',val(1),val(2),val(3));
-fclose(fid);
-
-%}
-
 end
