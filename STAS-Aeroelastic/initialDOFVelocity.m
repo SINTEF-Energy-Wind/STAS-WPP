@@ -20,10 +20,15 @@ function [x0,dq0dt,ret,slv] = initialDOFVelocity (s,q,P,Omega)
 % 
 
 [idofs,idofm,inods,inodm,Ndof] = getDOFRefs (s);
-[Tn_y,Th_d,Tb_h] = basicTransforms (s.nacelle.delta,s.driveshaft.phi);
-[Lambda,L,C,ret,slv] = constraints (q,P,Tb_h,idofs,idofm);
+Ndj = size(q,1);
+
+% Retained and slave structural DOFs.
+slv = slaveDOFs (idofs);
+vec = [1:Ndj].';
+[jnk,ret,jnk2] = partitionMatrix (vec,slv,[]);
 Nret = size(ret,1);
 Nslv = size(slv,1);
+
 x0   = zeros(2*Nret,1);
 x0(1:Nret) = q(ret);
 x0(2*Nret-6+2) = Omega;
