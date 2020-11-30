@@ -17,9 +17,6 @@ while (((real(Rval) > cnv) && (iter < Ns)) || (iter == 0))
    [y,dy] = fun (x);
    dRdx = dy;
 
-%[slap,shp,ifrq] = eigVal (AA);
-%return
-
    % Apply Newton's method on the equations.
    lam = 1;
    dxr = -dRdx\Res;
