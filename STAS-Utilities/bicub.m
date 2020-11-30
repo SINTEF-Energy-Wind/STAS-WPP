@@ -35,12 +35,8 @@ for jj = 4:-1:1
    yi = t.*yi + ((c(jj,4)*u + c(jj,3)).*u + c(jj,2)).*u + c(jj,1);
    dyi(:,2) = t.*dyi(:,2) + (3*c(jj,4)*u + 2*c(jj,3)).*u + c(jj,2);
    dyi(:,1) = u.*dyi(:,1) + (3*c(4,jj)*t + 2*c(3,jj)).*t + c(2,jj);
-   
+
 end
 
 dyi(:,1) = dyi(:,1)/d1;
 dyi(:,2) = dyi(:,2)/d2;
-
-%[d1 d2]
-%c
-%[xi t u yi dyi]
