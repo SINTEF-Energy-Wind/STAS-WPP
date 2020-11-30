@@ -42,3 +42,4 @@ y12 = cpct(ind,10);
 
 dcp = [dcp1(1)*(-lam/maxc(Vinf,del)); dcp1(1)*(R/maxc(Vinf,del)); dcp1(2)];
 dct = [dct1(1)*(-lam/maxc(Vinf,del)); dct1(1)*(R/maxc(Vinf,del)); dct1(2)];
+
