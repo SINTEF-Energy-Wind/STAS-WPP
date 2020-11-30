@@ -9,7 +9,7 @@ function dL = dLambdadq (Lambda,L,dLdq,dofs,ret,slv,v)
 %
 % Version:        Verification:
 % --------        -------------
-% 22.03.2018      
+% 22.03.2018      Verified by complex step using constraints.m
 %
 % Inputs:
 % -------
