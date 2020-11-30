@@ -1,5 +1,5 @@
 function [zr,Area,Dp,r,Lp,xeg,xhg,xyg] = ...
-                  BEMprepProjections (s,a,q,dqdt,P,Try,Trg)
+                  BEMprepProjections (s,a,q,P,Try,Trg)
 %
 % Define parameters that are updated on each call to BEMNL or BEMlin
 % for dx/dt.
@@ -24,8 +24,6 @@ function [zr,Area,Dp,r,Lp,xeg,xhg,xyg] = ...
 % Dp              : Diameter of the projected outer node on the rotorplane.
 % r               : Projected radial coordinate.
 % Lp              : Projected element length, not to be confused with Lel.
-
-%id = tic();
 
 [idofs,idofm,inods,inodm,Ndof] = getDOFRefs (s);
 
@@ -87,11 +85,10 @@ for ibod = 5:7
    end
 
    qB    = q(idref+[1:6]);
-   dqBdt = dqdt(idref+[1:6]);
    PB    = P(idref+[1:6]);
 
    for iel = 1:Neb
-%[ibod iel]
+
       jel = elref + iel;
       jc72  = 72*(jel-1);
       jc36  = 36*(jel-1);
@@ -105,9 +102,7 @@ for ibod = 5:7
       n2dof = idref + 6*(conn(3)-1);
 
       qn1    = q(n1dof+[1:6]);
-      dqn1dt = dqdt(n1dof+[1:6]);
       qn2    = q(n2dof+[1:6]);
-      dqn2dt = dqdt(n2dof+[1:6]);
       Pn1    = P(n1dof+[1:6]);
       Pn2    = P(n2dof+[1:6]);
 
@@ -128,11 +123,7 @@ for ibod = 5:7
       zr(jc2+[1:2]) = xer(1:2);
 
       Area(jel) = 2*pi*r(jel)*Lp(jel)/s.Nb;
-%'end loop'
-%toc(id)
+
    end
 
 end
-
-%'end BEMprepProjections'
-%toc(id)
