@@ -145,6 +145,7 @@ else
    dWhdV = dWns*dWh0dV;
    dWhdP = 0.5*WmWc*dWns*dWndWc*dWtdP/fcd ...
          + 0.5*(1 - Wns)*dWtdP/fcd;
+
 end
 
 % [From a perspective of Newton's method solution for operating points, 
@@ -230,4 +231,5 @@ C(1,:) = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 C(2,:) = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0];
 
 yout = [blp;Pehat];
+
 
