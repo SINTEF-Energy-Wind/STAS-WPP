@@ -148,4 +148,3 @@ else
    B = sparse(Nx,Nu);
 
 end 
-
