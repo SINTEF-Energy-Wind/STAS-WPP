@@ -33,13 +33,13 @@ Dy = zeros(3,1);
 
 aqa = aq - aoa;
 aaz  = aoa - az;
-aqaz1 = 1 + aqa/aaz;
 
 if (absc(aaz) < eps^(0.25))
-   Cld = Co(4)*aqa;
+   Cld = real(Co(4))*aqa;
    C(1) = -Co(4);
    Dy(1) = Co(4);
 else
+   aqaz1 = 1 + aqa/aaz;
    Cld = Co(1)*aqaz1;
    C(1) = Co(4)*aqaz1 - Co(1)/aaz - Co(1)*aqa/(aaz^2);
    Dy(1) = Co(1)/aaz;
