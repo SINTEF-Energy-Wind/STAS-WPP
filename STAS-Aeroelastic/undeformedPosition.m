@@ -142,14 +142,4 @@ for ib = 1:3
       Pn0_B(ir6+[4:6]) = thetaFromT (Ts0_B(:,ir3+[1:3]));
    end
 
-%{
-if (ib == 1)
-printVec(Pin(idofs(5+ib)+[1:6*Nnb]))
-printVec(Pn0_B(idofs(5+ib)+[1:6*Nnb]))
-for inod = 1:Nnb-1
-Ts0_B(:,3*(inod-1)+[1:3])
-end
-end
-%}
-
 end
