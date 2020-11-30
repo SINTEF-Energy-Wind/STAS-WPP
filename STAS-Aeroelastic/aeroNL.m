@@ -73,7 +73,7 @@ nodof = idofm(6) - 6; % idofs(5);
 [Tar,Trg,TB0g,TsB,TBB0,dTar,dTsB,dTBB0,wg] = ...
                  BEMprepTransforms (s,a,q,dqdt,P,Tas);
 [zr,Area,Dp,r,Lp,xeg,xhg,xyg] = ...
-                 BEMprepProjections (s,a,q,dqdt,P,Try,Trg);
+                 BEMprepProjections (s,a,q,P,Try,Trg);
 
 dxafdt = zeros(Nxf,1);
 ya    = zeros(6*Nel,1);
