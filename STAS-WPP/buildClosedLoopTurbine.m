@@ -1,14 +1,14 @@
-function [L,R,yout,A,B,C,D,blxdof,bludof,blydof] =                             ...
-               buildClosedLoopTurbine (x,u,s,a,epar,ppar,ypar,c,               ...
-                                       linFlag,psiFlag,modFlag,shpFlag,        ...                                      
-                                       grav,P,ret,slv,shape0,mdamp0,           ...
-                                       Tas,Try,ch,Lel,foilwt,aoaz,aoast,       ...
-                                       xas,yas,Psi0,igen,ipit,iyaw)
+function [L,R,yout,A,B,C,D] =                                              ...
+              buildClosedLoopTurbine (linFlag,x,u,s,a,epar,ppar,ypar,c,    ...                                     
+                                      grav,P,shape0,mdamp0,                ...
+                                      Tas,Try,ch,Lel,foilwt,aoaz,aoast,    ...
+                                      xas,yas,Psi0,igen,ipit,iyaw)
 %
 % Link the turbine control functions with the wind turbine.
 %
 %   States:              y vector:                u vector:
 %                                                 F       Ndj   (Env)
+%                                              d2eta/dt2  Neta  (u)
 %                                                 Vg    3*Nae   (Env)
 %                                                 we        1   (Grid)
 %                                                 th_e      2   (Grid)
@@ -17,7 +17,7 @@ function [L,R,yout,A,B,C,D,blxdof,bludof,blydof] =                             .
 %                                                 Qc        6   (Pl.cont.)
 % ----------------------- Structure --------------------------
 %   eta        N         q         Ndj            F       Ndj   (u)
-%   deta/dt    N         dq/dt     Ndj
+%   deta/dt    N         dq/dt     Ndj         d2eta/dt2  Neta  (u)
 %                        d2q/dt2   Ndj
 %                        F         Ndj
 %
@@ -29,16 +29,16 @@ function [L,R,yout,A,B,C,D,blxdof,bludof,blydof] =                             .
 %
 % ------------------------ Actuators --------------------------
 % (Repeat for each blade and yaw system.)
-%   ba         1         b,dbdt    (-)  (Turb)     bhat      1   (Cont)
+%   ba         1         b,dbdt    (-)  (Turb)    bhat      1   (Cont)
 %   dbadt      2         Ta         1
 %
 % ----------------------- Electrical --------------------------
-%   igd,q     1,2        wg        (-)  (Turb)     we        1   (u)
-%   Vdc        3         Tg         1              th_e      2   (u)
-%   ipd,q     4,5        isd,q     2,3             vsd,q    3,4  (u)
-%   imgd,q    6,7                                  ihgd,q   5,6  (Cont)
-%   Psig      8,9                                  Vhdc      7   (cpar)
-%   wemg      10                                   Qh        8   (u)
+%   igd,q     1,2        wg        (-)  (Turb)    we        1   (u)
+%   Vdc        3         Tg         1             th_e      2   (u)
+%   ipd,q     4,5        isd,q     2,3            vsd,q    3,4  (u)
+%   imgd,q    6,7                                 ihgd,q   5,6  (Cont)
+%   Psig      8,9                                 Vhdc      7   (cpar)
+%   wemg      10                                  Qh        8   (u)
 %   th_m      11
 %   vmsd,q   12,13
 %   Psie      14
@@ -81,10 +81,13 @@ function [L,R,yout,A,B,C,D,blxdof,bludof,blydof] =                             .
 % Version:        Changes:
 % --------        -------------
 % 02.02.2019      Original code.
+% 23.01.2020      Minor updates to accommodate the revisions to the
+%                 structural equations-of-motion and the u vector.
 %
 % Version:        Verification:
 % --------        -------------
 % 02.02.2019      
+% 23.01.2020      Derivatives of A matrix verified via complex step.
 %
 % Inputs:
 % -------
@@ -92,7 +95,7 @@ function [L,R,yout,A,B,C,D,blxdof,bludof,blydof] =                             .
 %
 % Outputs:
 % --------
-% yout            : 
+% 
 
 % Determine some indices.
 [idofs,idofm,inods,inodm,Ndof] = getDOFRefs (s);
@@ -100,7 +103,7 @@ Nnod = Ndof/6;
 Ndj  = Ndof + 6;
 Nae  = a.Nb*a.Neb;
 Neta = size(shape0,2);
-Nxs = 2*Neta;
+Nxs  = 2*Neta;
 Nxa  = size(Psi0,2);
 
 Nxp = 6;
@@ -116,19 +119,30 @@ Nya  = 137*Nae + 5;
 Ny1  = Nys + Nya;
 Ny1n = 4*Ndj;     % The nonlinear outputs.
 
-Nus  = Ndj;
+% Note, the indexing here is for the u vector input.  Note the
+% difference in Pc, Qc (u vector) versus Qh, Pc (matrices).
+Nuin = size(u,1);
+Nus  = Ndj + Neta;
 Nua  = 3*Nae;
 Nu1  = Nus + Nua;
-Nuin = size(u,1);
+Nup  = 0;
+Nue  = 4;
+Nuc  = 2;
 
-N3N  = Ndj + 3*Nae;
-F    = u(1:Ndj);
-Vg   = u(Ndj+[1:3*Nae]);
-we   = u(N3N+1);
-th_e = u(N3N+2);
-vs   = [u(N3N+3);u(N3N+4)];
-Pc   = u(N3N+5);
-Qc   = u(N3N+6);
+ius  = 0;
+iua  = ius + Nus;
+iup  = iua + Nua;
+iue  = iup + Nup;
+iuc  = iue + Nue;
+
+F    = u(ius+[1:Ndj]);
+etadd= u(ius+Ndj+[1:Neta]);
+Vg   = u(iua+[1:3*Nae]);
+we   = u(iue+1);
+th_e = u(iue+2);
+vs   = [u(iue+3);u(iue+4)];
+Pc   = u(iuc+1);
+Qc   = u(iuc+2);
 
 % Call the nonlinear control first.  The controller command outputs are
 % functions of the measured rotor azimuth (for IBP), and the internal 
@@ -159,13 +173,12 @@ bhat = ycout(1:3);
 ihg  = ycout(4:5);
 yang = 0;    % Yaw control not yet implemented.
 xt = x(1:Nx1+Nxp+Nxy+Nxe);
-ut = [F;Vg;bhat;yang;we;th_e;vs;ihg;c.Vhdc;Qc];
-[llt,rrt,ytout,aat,bbt,cct,ddt,blxt,blut,blyt] =                           ...
-               buildOpenLoopTurbine (linFlag,psiFlag,modFlag,shpFlag,      ...
-                                     xt,ut,s,a,epar,ppar,ypar,             ...
-                                     grav,P,ret,slv,shape0,mdamp0,         ...
-                                     Tas,Try,ch,Lel,foilwt,aoaz,aoast,     ...
-                                     xas,yas,Psi0,igen,ipit,iyaw);
+ut = [F;etadd;Vg;bhat;yang;we;th_e;vs;ihg;c.Vhdc;Qc];
+[llt,rrt,ytout,aat,bbt,cct,ddt] =                                 ...
+      buildOpenLoopTurbine (linFlag,xt,ut,s,a,epar,ppar,ypar,     ...
+                            grav,P,shape0,mdamp0,                 ...
+                            Tas,Try,ch,Lel,foilwt,aoaz,aoast,     ...
+                            xas,yas,Psi0,igen,ipit,iyaw);
 
 % Call the linear/nonlinear controller again to get the correct dx/dt
 % and if needed the linearized state matrices.
@@ -198,16 +211,6 @@ uc = [Pc;azi;Wg;bet;Pe;vT;zetpy;0];
                         c.KeTab,c.WVTab,c.WPTab,c.bminTab,c.KTables, ...
                         c.KFTab,c.KSTab,c.KSqTab,c.KpiTab,c.KiiTab,c.RSCFlag);
 
-% Assemble the combined vectors of blade DOFs.
-blNdj = [blyt(:,1)(blyt(:,1) <= Ndj) ... % Extract from q's.
-         blyt(:,2)(blyt(:,2) <= Ndj) ... 
-         blyt(:,3)(blyt(:,3) <= Ndj)];   
-blxdof = blxt;
-ind = [1:3*a.Neb].';
-bludof = [blNdj;Ndj+[ind, 3*a.Neb+ind, 6*a.Neb+ind]];
-blydof = [blNdj;Ndj+blNdj;2*Ndj+blNdj;3*Ndj+blNdj; ...
-          4*Ndj+[1 2 3];4*Ndj+7+[1 2 3]];
-
 L = [llt sparse(Nxt,Nxc);sparse(Nxc,Nxt) speye(Nxc)];
 R = [rrt;dxcdt];
 yout = [ytout;ycout];
@@ -228,7 +231,7 @@ if (linFlag == 1)
    ixe = ixy + Nxy;
    ixc = ixe + Nxe;
 
-   Nus = Ndj;
+   Nus = Ndj + Neta;
    Nua = 3*Nae;
    Nup = 3;
    Nuy = 1;
@@ -259,7 +262,7 @@ if (linFlag == 1)
    %  that the linear matrix row entries match the NL vector entries...)
    jz1 = [[1:3*Ndj] 3*Ndj+9*Nnod+[1:Ndj] Ny1+[3 6 9] Ny1+9+3 Ny1+12+[2 3 4]];
 
-   Nz = iyc + 6;
+   Nz = iyc + Nyc;
 
    Az = spalloc (Nx,Nx,0.3*Nx*Nx);
    Bu = spalloc (Nx,Nuin,0.2*Nx*Nuin);
@@ -280,8 +283,8 @@ if (linFlag == 1)
 
    % Link z vector u's with global u's.
    ir = [ius+[1:Nus] iua+[1:Nua] iue+[1 2 3 4 8] iuc+1];
-   ic = [[1:Ndj] Ndj+[1:3*Nae] Nu1+[1 2 3 4 6 5]];
-   ss = ones(1,Ndj+3*Nae+6);
+   ic = [[1:Ndj+Neta] Ndj+Neta+[1:3*Nae] Nu1+[1 2 3 4 6 5]];
+   ss = ones(1,Ndj+Neta+3*Nae+6);
    Du = Du + sparse (ir,ic,ss,Nz,Nuin);
 
    % Link z vector system u's with z vector control y's.
