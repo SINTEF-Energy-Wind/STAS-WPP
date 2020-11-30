@@ -1,7 +1,6 @@
-function [L,R,yout,A,B,C,D,blxdof,bludof,blydof] =                         ...
-               buildOpenLoopTurbine (linFlag,psiFlag,modFlag,shpFlag,      ...
-                                     x,u,s,a,epar,ppar,ypar,               ...
-                                     grav,P,ret,slv,shape0,mdamp0,         ...
+function [L,R,yout,A,B,C,D] =                                              ...
+               buildOpenLoopTurbine (linFlag,x,u,s,a,epar,ppar,ypar,       ...
+                                     grav,P,shape0,mdamp0,                 ...
                                      Tas,Try,ch,Lel,foilwt,aoaz,aoast,     ...
                                      xas,yas,Psi0,igen,ipit,iyaw)
 %
@@ -11,7 +10,7 @@ function [L,R,yout,A,B,C,D,blxdof,bludof,blydof] =                         ...
 %   States:              y vector:             u vector:
 % ----------------------- Structure --------------------------
 %   eta        N         q         Ndj            F       Ndj   (Env)
-%   deta/dt    N         dq/dt     Ndj
+%   deta/dt    N         dq/dt     Ndj         d2eta/dt2  Neta  (ext. solution)
 %                        d2q/dt2   Ndj
 %                        xng     3*Nnod
 %                        vng     6*Nnod
@@ -80,13 +79,16 @@ function [L,R,yout,A,B,C,D,blxdof,bludof,blydof] =                         ...
 % Version:        Changes:
 % --------        -------------
 % 12.01.2019      Original code.
+% 22.01.2020      Minor updates to accommodate revised aeroelastic.m,
+%                 including updated structural equations-of-motion.
 %
 % Version:        Verification:
 % --------        -------------
 % 12.01.2019      Most terms in the A matrix have been verified by complex
 %                 step.  There is a known issue with the nacelle yaw position,
 %                 here the linear and nonlinear equations don't agree.
-% NEED TO CHECK BLXDOF, BLUDOF, BLYDOF
+% 22.01.2020      "A" matrix derivatives verified using complex step on L,R.
+%                 The above issue with nacelle yaw was fixed.
 %
 % Inputs:
 % -------
@@ -120,6 +122,7 @@ function [L,R,yout,A,B,C,D,blxdof,bludof,blydof] =                         ...
 %                  24,25  PsiP  (Ws)    Integrated current error.
 %
 % u               : Ndj   F     (N,Nm)  Applied nodal forces and moments.
+%                   Neta  etadd (1/s^2) Rate-of-rate-of-change of...
 %                   ---
 %    Each bld. el.   3    Vg    (m/s)   Global V wind for each blade element.
 %                   ---
@@ -141,8 +144,6 @@ function [L,R,yout,A,B,C,D,blxdof,bludof,blydof] =                         ...
 % dxdt            : Rate of change of states.
 % yout            : The full y vector.
 % A,B,C,D         : Linearized state matrices.
-% bl(x,u,y)dof    : 3-by-n matrices with each column containing a trio of DOFs,
-%                   associated with the 3 blades.
 
 [idofs,idofm,inods,inodm,Ndof] = getDOFRefs (s);
 
@@ -150,7 +151,7 @@ Nnod = Ndof/6;
 Ndj = size(P,1);
 Neta = size(shape0,2);
 Neb = a.Neb;
-Nel = a.Neb*a.Nb;
+Nae = a.Neb*a.Nb;
 
 Nx  = size(x,1);
 Nxs = 2*Neta;
@@ -161,8 +162,8 @@ Nxy = 2;
 Nxe = 25;
 
 Nu  = size(u,1);
-Nus = Ndj;
-Nua = 3*Nel;
+Nus = Ndj + Neta;
+Nua = 3*Nae;
 Nup = a.Nb;
 Nuy = 1;
 Nue = 8;
@@ -178,6 +179,19 @@ iua = ius + Nus;
 iup = iua + Nua;
 iuy = iup + Nup;
 iue = iuy + Nuy;
+
+% Extract q's from x's.
+slv = slaveDOFs (idofs);
+vec = [1:Ndj].';
+[jnk,ret,jnk2] = partitionMatrix (vec,slv,[]);
+xs   = x(1:Nxs);
+eta  = xs(1:Neta);
+etad = xs(Neta+[1:Neta]);
+zro  = zeros(Neta,1);     % Not needed for nonlinear.
+
+[qh,qhd,jnk1,jnk2] = buildTetaqh (eta,etad,zro,shape0);
+
+[q,dqdt,jnk2,jnk3,jnk4,jnk5] = buildTqhq (0,s,qh,qhd,jnk1,P,ret,slv);
 
 % Electrical model.
 qguess = zeros(size(slv,1),1);
@@ -210,10 +224,7 @@ yyin = [u(iuy+1);q(iyaw);dqdt(iyaw)];
 [dxydt,yyout,aay,bbyy,ccy,ddyy] = buildDrive (linFlag,xy,yyin,ypar);
 
 % Aeroelastic model.
-t = 0;
-x1 = x(1:Nx1);
-y1 = [q;dqdt];  % Only y input values that are used in aeroelasticNL...
-Vg = u(iua+[1:Nua]);
+x1  = x(1:Nx1);
 
 % Apply the generator torque.
 Fext = zeros(Ndj,1);
@@ -224,7 +235,7 @@ Tn0d = TFromTheta (Pgen(22:24));
 Fext(igen(10:12)) = Tm0y*Tmm0*[-yeout(1);0;0];
 Fext(igen(22:24)) = Tn0d*Tnn0*[yeout(1);0;0];
 
-% Apply the actuator torques.
+% Apply the pitch actuator torques.
 for ib = 1:3
    Tmm0 = TFromTheta (q(idofm(5+ib)+[4:6]));
    Tm0d = TFromTheta (P(idofm(5+ib)+[4:6]));
@@ -232,20 +243,24 @@ for ib = 1:3
    Fext(idofs(5+ib)+4) = -ypout(ib);
 end
 
+% Apply the yaw actuator torque.
 Tmm0 = TFromTheta (q(idofm(3)+[4:6]));
 Tm0t = TFromTheta (P(idofm(3)+[4:6]));
 Fext(idofm(3)+[4:6]) = Tm0t*Tmm0*[-yyout;0;0];
 Fext(idofs(3)+6) = yyout;
 
-[Lmat,Rvec,yae] =                              ...
-      aeroelasticNL (t,x1,y1,Fext,grav,        ...
-                     psiFlag,s,a,P,            ...
-                     ret,slv,shape0,mdamp0,    ...
-                     Tas,Try,Vg,ch,Lel,foilwt, ...
-                     aoaz,aoast,xas,yas,Psi0);
+u1        = u(1:Nus+Nua);
+u1(1:Ndj) = u1(1:Ndj) + Fext;
+
+[Lmat,Rvec,yae,jA,jBu,jBy,jC,jDu,jDy] =   ...
+   aeroelastic (0,s,a,x1,u1,P,            ...
+                shape0,mdamp0,grav,       ...
+                Tas,Try,ch,Lel,foilwt,    ...
+                aoaz,aoast,xas,yas,Psi0);
+Nyal = size(jC,1);
 
 % Form the nonlinear outputs.
-indy = [[1:3*Ndj] 3*Ndj+6*Nel+[1:Ndj]].';
+indy = [[1:3*Ndj] 3*Ndj+6*Nae+[1:Ndj]].';
 
 Nxpye = Nxp + Nxy + Nxe;
 L = [Lmat sparse(Nx1,Nxpye);sparse(Nxpye,Nx1) speye(Nxpye)];
@@ -254,59 +269,19 @@ R = [Rvec;dxpdt;dxydt;dxedt];
 yout = [yae(indy);ypout;yyout;yeout];
 Nyout = size(yout,1);
 
-if (modFlag == 1)
-   [imdofs,Nmd] = getmdofRefs (s);
-   [bs1,bs2,bs3] = MBCindices_Nmd (Nmd,imdofs);
-else
-   [bs1,bs2,bs3] = MBCindices_Nret (Ndj,idofs,ret,slv);
-end
-Nxab = Nxa/a.Nb;
-Nxpb = Nxp/a.Nb;
-Nblxdof = 2*size(bs1,1) + Nxab + Nxpb;
-blxdof = zeros(Nblxdof,3);
-blxdof(:,1) = [bs1.', Neta+bs1.', Nxs+[1:Nxab], Nx1+[1:Nxpb]].';
-blxdof(:,2) = [bs2.', Neta+bs2.', Nxs+Nxab+[1:Nxab], Nx1+Nxpb+[1:Nxpb]].';
-blxdof(:,3) = [bs3.', Neta+bs3.', Nxs+2*Nxab+[1:Nxab], Nx1+2*Nxpb+[1:Nxpb]].';
-[bj1,bj2,bj3] = MBCindices_Ndj (Ndj,idofs);
-Nbludof = size(bj1,1) + 3*Neb + 1;
-bludof = zeros(Nbludof,3);
-bludof(:,1) = [bj1.', Nus+[1:3*Neb], Nus+Nua+1].';
-bludof(:,2) = [bj2.', Nus+3*Neb+[1:3*Neb], Nus+Nua+2].';
-bludof(:,3) = [bj3.', Nus+6*Neb+[1:3*Neb], Nus+Nua+3].';
-Nbnod = Neb+1;
-Nblydof = 4*size(bj1,1) + 9*Nbnod + 137*Neb + 1 + 3;
-blydof = zeros(Nblydof,3);
-blydof(:,1) = [bj1.', Ndj+bj1.', 2*Ndj+bj1.',                    ...
-               3*Ndj+3*Nnod-9*Nbnod+[1:3*Nbnod],                 ...
-               3*Ndj+3*Nnod+6*Nnod-18*Nbnod+[1:6*Nbnod],         ...
-               3*Ndj+9*Nnod+bj1.',4*Ndj+9*Nnod+[1:137*Neb],      ...
-               4*Ndj+9*Nnod+137*Nel+3,4*Ndj+9*Nnod+137*Nel+5+[1:3]].';
-blydof(:,2) = [bj2.', Ndj+bj2.', 2*Ndj+bj2.',                       ...
-               3*Ndj+3*Nnod-6*Nbnod+[1:3*Nbnod],                    ...
-               3*Ndj+3*Nnod+6*Nnod-12*Nbnod+[1:6*Nbnod],            ...
-               3*Ndj+9*Nnod+bj2.',4*Ndj+9*Nnod+137*Neb+[1:137*Neb], ...
-               4*Ndj+9*Nnod+137*Nel+4,4*Ndj+9*Nnod+137*Nel+5+3+[1:3]].';
-blydof(:,3) = [bj3.', Ndj+bj3.', 2*Ndj+bj3.',                         ...
-               3*Ndj+3*Nnod-3*Nbnod+[1:3*Nbnod],                      ...
-               3*Ndj+3*Nnod+6*Nnod-6*Nbnod+[1:6*Nbnod],               ...
-               3*Ndj+9*Nnod+bj3.',4*Ndj+9*Nnod+2*137*Neb+[1:137*Neb], ...
-               4*Ndj+9*Nnod+137*Nel+5,4*Ndj+9*Nnod+137*Nel+5+6+[1:3]].';
-
 if (linFlag == 1)
 
    % Generate the linearized aeroelastic matrices.
    q = yae(1:Ndj);
    dq = yae(Ndj+[1:Ndj]);
    d2q = yae(2*Ndj+[1:Ndj]);
-   F = yae(3*Ndj+6*Nel+[1:Ndj]);
-   [LHS,aa1,bbu1,bby1,cc1,ddu1,ddy1,shape,freq,mdamp,ret,slv,Psi] = ...
-              aeroelasticLin (x1,Vg,s,a,q,dq,d2q,P,F,               ...
-                              psiFlag,modFlag,shpFlag,              ...
-                              shape0,mdamp0,grav);
+   F = yae(3*Ndj+6*Nae+[1:Ndj]);
 
-%   aa1 = LHS\aa11;
-%   bbu1 = LHS\bbu11;
-%   bby1 = LHS\bby11;
+   [Lmat,Rvec,yae,aa1,bbu1,bby1,cc1,ddu1,ddy1] = ...
+         aeroelastic (1,s,a,x1,u1,P,             ...
+                      shape0,mdamp0,grav,        ...
+                      Tas,Try,ch,Lel,foilwt,     ...
+                      aoaz,aoast,xas,yas,Psi0);
 
    Ny1 = size(cc1,1);
    Nyp = size(ccp,1) - Nup;  % Going to partition out u variables.
@@ -320,16 +295,16 @@ if (linFlag == 1)
    iye = iyy + Nyy;
 
    % Fill the un-linked matrices. 
-   aa = spalloc (Nx,Nx,round(0.3*Nx*Nx));
+   aa  = spalloc (Nx,Nx,round(0.3*Nx*Nx));
    bbu = spalloc (Nx,Nu,round(0.15*Nx*Nu));
    bby = spalloc (Nx,Ny,round(0.02*Nx*Ny));
-   cc = spalloc (Ny,Nx,round(0.08*Ny*Nx));
+   cc  = spalloc (Ny,Nx,round(0.08*Ny*Nx));
    ddu = spalloc (Ny,Nu,round(0.08*Ny*Nu));
    ddy = spalloc (Ny,Ny,round(1e-5*Ny*Ny));
 
-   indx = ixs + [1:Nx1].';
-   indu = ius + [1:Nus+Nua].';
-   indy = iy1 + [1:Ny1].';
+   indx = ixs  + [1:Nx1].';
+   indu = ius  + [1:Nus+Nua].';
+   indy = iy1  + [1:Ny1].';
    aa(indx,indx)  = aa1;
    bbu(indx,indu) = bbu1;
    bby(indx,indy) = bby1;
@@ -337,9 +312,9 @@ if (linFlag == 1)
    ddu(indy,indu) = ddu1;
    ddy(indy,indy) = ddy1;
 
-   indx = ixp + [1:Nxp].';
-   indu = iup + [1:Nup].';
-   indy = iyp + [1:Nyp].';
+   indx = ixp  + [1:Nxp].';
+   indu = iup  + [1:Nup].';
+   indy = iyp  + [1:Nyp].';
    ju = [1 5 9].';
    jy = [2 3 4 6 7 8 10 11 12].';
    aa(indx,indx)  = aap;
@@ -349,32 +324,32 @@ if (linFlag == 1)
    ddu(indy,indu) = ddyp(jy,ju);
    ddy(indy,indy) = ddyp(jy,jy);
 
-   indx = ixy + [1:Nxy].';
-   indu = iuy + [1:Nuy].';
-   indy = iyy + [1:Nyy].';
+   indx = ixy  + [1:Nxy].';
+   indu = iuy  + [1:Nuy].';
+   indy = iyy  + [1:Nyy].';
    ju = 1;
    jy = [2 3 4].';
-   aa(indx,indx) = aay;
+   aa(indx,indx)  = aay;
    bbu(indx,indu) = bbyy(:,ju);
    bby(indx,indy) = bbyy(:,jy);
-   cc(indy,indx) = ccy(jy,:);
+   cc(indy,indx)  = ccy(jy,:);
    ddu(indy,indu) = ddyy(jy,ju);
    ddy(indy,indy) = ddyy(jy,jy);
 
    % The indexing in buildTurbineElectric is handled a bit differently,
    % distinguishing between inputs and outputs.
-   indx = ixe + [1:Nxe].';
-   indu = iue + [1:Nue].';    % The turbine indices for the u inputs.
+   indx = ixe  + [1:Nxe].';
+   indu = iue  + [1:Nue].';   % The turbine indices for the u inputs.
    indyi = iye + 1;           % The turbine index of electrical input wg.
    indyo = iye + [2:4].';     % The turbine indices of electrical outputs Tg, isd,q.
    ju = [2:9].';              % The elec u (input) indices for the turbine u inputs.
    jyi = 1;                   % The electric u (input) index for wg.
    jyo = [1:3].';             % The electric y (output) indices for Tg, isd,q. 
-   aa(indx,indx)  = aae;
-   bbu(indx,indu) = bbye(:,ju);
-   bby(indx,indyi) = bbye(:,jyi);
-   cc(indyo,indx)  = cce(jyo,:);
-   ddu(indyo,indu) = ddye(jyo,ju);
+   aa(indx,indx)    = aae;
+   bbu(indx,indu)   = bbye(:,ju);
+   bby(indx,indyi)  = bbye(:,jyi);
+   cc(indyo,indx)   = cce(jyo,:);
+   ddu(indyo,indu)  = ddye(jyo,ju);
    ddy(indyo,indyi) = ddye(jyo,jyi);
 
    % Link the turbine blade pitch and pitch rate to the actuators.
@@ -401,6 +376,11 @@ if (linFlag == 1)
       ddy(ir,ic) = -1;
    end
 
+   % Link the turbine yaw angle and yaw rate to the actuator.
+   ir = iyy + [1;2];
+   ic = iy1 + [iyaw;Ndj+iyaw];
+   ddy(ir,ic) = speye(2);
+
    % Link the yaw actuator torque to the tower and nacelle nodes.
    mdofs = idofm(3)+[4:6];
    [Tmm0,dTmm0] = dTdth (q(idofm(3)+[4:6]));
@@ -414,7 +394,7 @@ if (linFlag == 1)
       ddy(ir,ic(ith)) = ddy(ir,ic(ith)) ...
                       - Tm0t*dTmm0(:,ic3+1)*yyout;
    end
-   ir = 3*Ndj + 9*Nnod + idofs(3)+6;
+   ir = 3*Ndj + 9*Nnod + idofs(3) + 6;
    ic = iyy + 3;
    ddy(ir,ic) = 1;
 
@@ -454,8 +434,8 @@ if (linFlag == 1)
    % each other.  That is, the aerodynamic part is pretty close to diagonal,
    % and can be inverted quickly.  This operation is done separately from
    % the rest of the Dy matrix.
-   adofs = 4*Ndj+9*Nnod+[1:137*Nel].';
-   rdofs = [[1:4*Ndj+9*Nnod] [4*Ndj+9*Nnod+137*Nel+1:Ny]].';
+   adofs = 4*Ndj+9*Nnod+[1:137*Nae].';
+   rdofs = [[1:4*Ndj+9*Nnod] [4*Ndj+9*Nnod+137*Nae+1:Ny]].';
    Na = size(adofs,1);
    Nr = size(rdofs,1);
    Nz = size(cc,2) + size(ddu,2);
@@ -482,7 +462,10 @@ if (linFlag == 1)
 
 else
 
-   Ny = 1;
+   Nyp = size(ccp,1) - Nup;
+   Nyy = size(ccy,1) - Nuy;
+   Nye = size(yeout,1) + size(yein,1) - Nue;
+   Ny = Nyal + Nyp + Nyy + Nye;
 
    A = sparse(Nx,Nx);
    B = sparse(Nx,Nu);
