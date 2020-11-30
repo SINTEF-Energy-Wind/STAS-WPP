@@ -1,15 +1,13 @@
-function PP = solveRiccati (BCflag,AA,BC,QQ,RR,TT)
-
+function [PP,KK] = solveRiccati (solver,BCflag,AA,BC,QQ,RR,KK0,tf,dt)
 
 % CAUTION, NOT ADAPTED FOR COMPLEX STEP DERIVATIVES.
 
-
-
 %
-% Integrates the matrix Riccati equation in time to find the steady-
-% state solution.  A "lazy" approach is used, integrating the time-
-% dependenent equations to the steady state.  This is functional but
-% not the most efficient way to do it.
+% Integrates the matrix Riccati equation in time, or applies an 
+% iterative solution, to find the steady-state solution.  The
+% methods provided each have their strengths and weaknesses, so
+% it is recommended to experiment and see which works best for
+% a particular problem.
 %
 % Version:        Changes:
 % --------        -------------
@@ -17,7 +15,8 @@ function PP = solveRiccati (BCflag,AA,BC,QQ,RR,TT)
 %
 % Version:        Verification:
 % --------        -------------
-% 27.02.2017
+% 27.02.2017      Proven to drive the residual to zero, which by
+%                 definition is the correct solution.
 %
 % Inputs:
 % -------
@@ -37,70 +36,74 @@ function PP = solveRiccati (BCflag,AA,BC,QQ,RR,TT)
 % --------
 %
 
-solver = 2;  % 2 is much faster.  1 has been observed to be more
-             % reliable when the weightings lead to poor numerical
-             % conditioning.
+Nx = size(AA,1);
+
+if (BCflag == 1)
+   AA_Ric = AA;
+   BC_Ric = BC;
+   QQ_Ric = QQ;
+   RR_Ric = RR;
+elseif (BCflag == 2)
+   AA_Ric = AA.';
+   BC_Ric = BC.';
+   QQ_Ric = QQ;   % Symmetric, regardless.
+   RR_Ric = RR;   % Symmetric, regardless.
+end
 
 if (solver == 1)
 
-   global AA_Ric BC_Ric QQ_Ric RR_Ric
-
-   Nx = size(AA,1);
-
-   if (BCflag == 1)
-      AA_Ric = AA;
-      BC_Ric = BC;
-      QQ_Ric = QQ;
-      RR_Ric = RR;
-   elseif (BCflag == 2)
-      AA_Ric = AA.';
-      BC_Ric = BC.';
-      QQ_Ric = QQ;   % Symmetric, regardless.
-      RR_Ric = RR;   % Symmetric, regardless.
-   end
-
-   ts = TT*[0 0.9 0.95 1]';
+   ts = [0:dt:tf].';
    Nt = size(ts,1);
 
-   pvec0 = zeros(Nx^2,1);
-   [pvec,istate,msg] = lsode (@RiccatiQS,pvec0,ts);
-
-   'Infinite horizon Riccati equation'
-%   ts'
-%   pvec'
-
    PP = zeros(Nx,Nx);
-   for icol = 1:Nx
-      ind = Nx*(icol-1);
-      PP(:,icol) = pvec(Nt,ind+[1:Nx]);
-   end
+   for it = 1:Nt
 
-%   clear AA_Ric BC_Ric QQ_Ric RR_Ric
+if (mod(it,100) == 1)
+printf ('%6d of %6d\n',it,Nt);
+fflush(stdout);
+end
+
+      t = ts(it);
+      [k1,jnk] = RiccatiQS (0,PP,AA_Ric,BC_Ric,QQ_Ric,RR_Ric);
+      PP1 = PP + 0.5*k1*dt;
+      [k2,jnk] = RiccatiQS (0,PP1,AA_Ric,BC_Ric,QQ_Ric,RR_Ric);
+      PP = PP + k2*dt;
+
+   end
 
 elseif (solver == 2)
 
-   if (BCflag == 1)
-      AA_Ric = AA;
-      BC_Ric = BC;
-      QQ_Ric = QQ;
-      RR_Ric = RR;
-   elseif (BCflag == 2)
-      AA_Ric = AA.';
-      BC_Ric = BC.';
-      QQ_Ric = QQ;   % Symmetric, regardless.
-      RR_Ric = RR;   % Symmetric, regardless.
-   end
-
+   % Caution, this tends to corrupt Octave's memory if the model
+   % is large.  Problems were encountered with a few hundred DOFs.
    [PP,LL,GG] = care (AA_Ric,BC_Ric,QQ_Ric,RR_Ric);
+
+elseif (solver == 3)
+
+   flg = 0;
+   iter = 0;
+   itmax = 50;
+   conv = sqrt(eps);
+   KK = KK0;
+   while ((flg == 0) && (iter <= itmax))
+      iter = iter + 1;
+      RHS = -(QQ_Ric + (KK.')*RR*KK);
+      PP = lyap ((AA_Ric.')-(KK.')*(BC_Ric.'),-RHS);
+      KK = RR\((BC_Ric.')*PP);
+      Ric = (AA_Ric.')*PP + PP*AA_Ric - RHS;
+      if (max(max(abs(Ric))) < conv)
+         flg = 1;
+      end
+%printf('%5d  %+5.4e\n',iter,max(max(abs(Ric))));
+   end
 
 end
 
-PP
+KK = RR\((BC_Ric.')*PP);
 
-'Riccati, should be zero'
+% Riccati residual, should be zero.
 Ric = (AA_Ric.')*PP + PP*AA_Ric + QQ_Ric ...
     - PP*BC_Ric*inv(RR_Ric)*(BC_Ric.')*PP;
-'Normalized accuracy'
-Ric./PP
 
-clear AA_Ric BC_Ric QQ_Ric RR_Ric
+% Absolute accuracy, normalized accuracy.
+[max(max(abs(Ric))) max(max(abs(Ric./PP)))]
+
